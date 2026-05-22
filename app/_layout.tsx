@@ -1,24 +1,26 @@
-import '../global.css';
-import { Stack, router } from 'expo-router';
-import { useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { View, StatusBar } from 'react-native';
-import { ActivityIndicator } from 'react-native-paper';
-import { PaperProvider, MD3DarkTheme } from 'react-native-paper';
+import "../global.css";
+import { Stack, router, usePathname } from "expo-router";
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { View, StatusBar, LogBox } from "react-native";
+
+LogBox.ignoreAllLogs();
+import { ActivityIndicator } from "react-native-paper";
+import { PaperProvider, MD3DarkTheme } from "react-native-paper";
 
 // Syncnox brand theme for React Native Paper
 const syncnoxTheme = {
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: '#6EB46E',
-    secondary: '#003220',
-    background: '#001A0F',
-    surface: '#0D2E1A',
-    onPrimary: '#FFFFFF',
-    onBackground: '#FFFFFF',
-    onSurface: '#FFFFFF',
-    error: '#ff4d4f',
+    primary: "#6EB46E",
+    secondary: "#003220",
+    background: "#001A0F",
+    surface: "#0D2E1A",
+    onPrimary: "#FFFFFF",
+    onBackground: "#FFFFFF",
+    onSurface: "#FFFFFF",
+    error: "#ff4d4f",
   },
 };
 
@@ -28,6 +30,7 @@ const syncnoxTheme = {
  */
 export default function RootLayout() {
   const { activationCode, isLoading, checkStoredCode } = useAuth();
+  const pathName = usePathname();
 
   useEffect(() => {
     checkStoredCode();
@@ -36,7 +39,9 @@ export default function RootLayout() {
   useEffect(() => {
     if (!isLoading) {
       if (activationCode) {
-        router.replace('/(home)');
+        router.replace("/(home)/home");
+      } else {
+        router.replace("/");
       }
     }
   }, [isLoading, activationCode]);
@@ -53,11 +58,24 @@ export default function RootLayout() {
 
   return (
     <PaperProvider theme={syncnoxTheme}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="login" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="(home)" />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: "slide_from_right",
+          contentStyle: { backgroundColor: "#001A0F" },
+        }}
+      >
+        <Stack.Screen name="index" options={{ animation: "fade" }} />
+        <Stack.Screen
+          name="login"
+          options={{ animation: "slide_from_right" }}
+        />
+        <Stack.Screen name="(home)" options={{ animation: "fade" }} />
       </Stack>
     </PaperProvider>
   );

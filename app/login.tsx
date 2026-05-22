@@ -11,7 +11,6 @@ import {
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Snackbar } from "react-native-paper";
 import GradientBackground from "@/components/ui/GradientBackground";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import CodeInput from "@/components/ui/CodeInput";
@@ -34,11 +33,13 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await new Promise((r) => setTimeout(r, 800));
-      const success = await login(code);
-      if (success) {
-        router.replace("/(home)");
+      const res = await login(code);
+      if (res.success) {
+        router.replace("/(home)/home");
       } else {
-        setSnackbarMsg("Failed to save your activation key. Please try again.");
+        setSnackbarMsg(
+          res.error || "Failed to save your activation key. Please try again.",
+        );
       }
     } catch {
       setSnackbarMsg("Something went wrong. Please try again.");
@@ -90,6 +91,12 @@ export default function LoginScreen() {
               <CodeInput value={code} onChange={setCode} autoFocus />
               <Text className="text-white/40 text-sm text-center mt-3">
                 Enter your key here
+              </Text>
+            </View>
+
+            <View>
+              <Text className="text-red-700 text-sm text-center mt-3">
+                {snackbarMsg || ""}
               </Text>
             </View>
 
@@ -150,16 +157,6 @@ export default function LoginScreen() {
             </Text>
           </ScrollView>
         </KeyboardAvoidingView>
-
-        <Snackbar
-          visible={snackbarMsg !== ""}
-          onDismiss={() => setSnackbarMsg("")}
-          duration={3000}
-          style={{ backgroundColor: "#1a0505" }}
-          action={{ label: "OK", onPress: () => setSnackbarMsg("") }}
-        >
-          {snackbarMsg}
-        </Snackbar>
       </SafeAreaView>
     </GradientBackground>
   );

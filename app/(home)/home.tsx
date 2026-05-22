@@ -14,7 +14,11 @@ import { useAuth } from '@/hooks/useAuth';
  * Will be replaced with Orders list in Phase 3.
  */
 export default function HomeScreen() {
-  const { logout } = useAuth();
+  const { logout, driverName, checkStoredCode } = useAuth();
+
+  React.useEffect(() => {
+    checkStoredCode();
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -71,8 +75,8 @@ export default function HomeScreen() {
             >
               <Ionicons name="cube-outline" size={48} color="#6EB46E" />
             </View>
-            <Text className="text-white text-[22px] font-bold tracking-tight">
-              Home Screen
+            <Text className="text-white text-[22px] font-bold tracking-tight text-center">
+              Welcome, {driverName || 'Driver'}!
             </Text>
             <Text className="text-white/60 text-sm text-center leading-5">
               Orders, Map, and Settings coming in the next phase.{'\n'}

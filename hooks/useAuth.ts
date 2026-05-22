@@ -1,53 +1,10 @@
-import * as SecureStore from 'expo-secure-store';
-import { useState, useCallback } from 'react';
-
-const ACTIVATION_CODE_KEY = 'syncnox_activation_code';
+import { useAuthStore } from '@/store/auth.store';
 
 /**
- * Production-grade auth hook using expo-secure-store (Keychain/Keystore).
- *
- * Usage:
- *   const { activationCode, login, logout, isLoading } = useAuth();
- *
- * - activationCode: null = not authenticated, string = authenticated
- * - login(code): persists code to secure storage
- * - logout(): clears code from secure storage
- * - isLoading: true while checking storage on mount
+ * Auth hook wrapper that delegates to the useAuthStore Zustand store.
+ * This preserves clean component hook usage while leveraging Zustand under the hood.
  */
 export function useAuth() {
-  const [activationCode, setActivationCode] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const checkStoredCode = useCallback(async () => {
-    try {
-      const stored = await SecureStore.getItemAsync(ACTIVATION_CODE_KEY);
-      setActivationCode(stored);
-    } catch (e) {
-      // SecureStore not available (e.g. web) — treat as not authenticated
-      setActivationCode(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const login = useCallback(async (code: string) => {
-    try {
-      await SecureStore.setItemAsync(ACTIVATION_CODE_KEY, code);
-      setActivationCode(code);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }, []);
-
-  const logout = useCallback(async () => {
-    try {
-      await SecureStore.deleteItemAsync(ACTIVATION_CODE_KEY);
-      setActivationCode(null);
-    } catch (e) {
-      // ignore
-    }
-  }, []);
-
-  return { activationCode, isLoading, login, logout, checkStoredCode };
+  const { activationCode, driverName, isLoading, login, logout, checkStoredCode } = useAuthStore();
+  return { activationCode, driverName, isLoading, login, logout, checkStoredCode };
 }
