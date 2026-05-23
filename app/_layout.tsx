@@ -1,7 +1,7 @@
 import "../global.css";
 import { Stack, router, usePathname } from "expo-router";
 import { useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuthStore } from "@/store/auth.store";
 import { View, StatusBar, LogBox } from "react-native";
 
 LogBox.ignoreAllLogs();
@@ -29,7 +29,7 @@ const syncnoxTheme = {
  * checks SecureStore on mount, and redirects authenticated users to Home.
  */
 export default function RootLayout() {
-  const { activationCode, isLoading, checkStoredCode } = useAuth();
+  const { activationCode, isLoading, checkStoredCode } = useAuthStore();
   const pathName = usePathname();
 
   useEffect(() => {

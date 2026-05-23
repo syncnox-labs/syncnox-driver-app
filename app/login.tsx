@@ -14,16 +14,14 @@ import { Ionicons } from "@expo/vector-icons";
 import GradientBackground from "@/components/ui/GradientBackground";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import CodeInput from "@/components/ui/CodeInput";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuthStore } from "@/store/auth.store";
 
 const REQUIRED_LENGTH = 12;
 
 export default function LoginScreen() {
-  const [code, setCode] = useState("");
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const { login, setCode, code } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState("");
-  const { login } = useAuth();
 
   const isComplete = code.length === REQUIRED_LENGTH;
   const canActivate = isComplete;
@@ -33,7 +31,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await new Promise((r) => setTimeout(r, 800));
-      const res = await login(code);
+      const res = await login();
       if (res.success) {
         router.replace("/(home)/home");
       } else {
@@ -88,7 +86,7 @@ export default function LoginScreen() {
 
             {/* Code input block */}
             <View className="items-center mb-2 mt-16">
-              <CodeInput value={code} onChange={setCode} autoFocus />
+              <CodeInput value={code} onChange={(v) => { setCode(v); setSnackbarMsg(""); }} autoFocus />
               <Text className="text-white/40 text-sm text-center mt-3">
                 Enter your key here
               </Text>

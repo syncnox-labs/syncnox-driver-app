@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Divider } from 'react-native-paper';
 import GradientBackground from '@/components/ui/GradientBackground';
 import SyncnoxMark from '@/components/SyncnoxMark';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/store/auth.store';
 
 /**
  * Home screen stub (Phase 1).
@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
  * Will be replaced with Orders list in Phase 3.
  */
 export default function HomeScreen() {
-  const { logout, driverName, checkStoredCode } = useAuth();
+  const { logout, driverName, checkStoredCode } = useAuthStore();
 
   React.useEffect(() => {
     checkStoredCode();

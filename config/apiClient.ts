@@ -13,7 +13,7 @@ export const apiClient = axios.create({
   },
 });
 
-// Automatic interceptor to attach 'activation-code' to every outgoing API request
+// Automatically attach activation-code header from SecureStore on every request
 apiClient.interceptors.request.use(
   async (config) => {
     try {
@@ -26,7 +26,5 @@ apiClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
