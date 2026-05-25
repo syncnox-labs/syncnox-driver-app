@@ -5,11 +5,13 @@ import { router } from 'expo-router';
 
 const ACTIVATION_CODE_KEY = 'syncnox_activation_code';
 const DRIVER_NAME_KEY = 'syncnox_driver_name';
+const DRIVER_ID_KEY = 'syncnox_driver_id';
 
 interface AuthState {
   code: string;
   activationCode: string | null;
   driverName: string | null;
+  driverId: number | null;  // ← the driver's actual numeric DB ID
   isLoading: boolean;
   setCode: (code: string) => void;
   checkStoredCode: () => Promise<void>;
@@ -21,6 +23,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   code: '',
   activationCode: null,
   driverName: null,
+  driverId: null,
   isLoading: true,
 
   setCode: (code) => set({ code }),
@@ -29,9 +32,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const storedCode = await SecureStore.getItemAsync(ACTIVATION_CODE_KEY);
       const storedName = await SecureStore.getItemAsync(DRIVER_NAME_KEY);
-      set({ activationCode: storedCode, driverName: storedName, isLoading: false });
+      const storedIdStr = await SecureStore.getItemAsync(DRIVER_ID_KEY);
+      const storedId = storedIdStr ? parseInt(storedIdStr, 10) : null;
+      set({
+        activationCode: storedCode,
+        driverName: storedName,
+        driverId: storedId,
+        isLoading: false,
+      });
     } catch (e) {
-      set({ activationCode: null, driverName: null, isLoading: false });
+      set({ activationCode: null, driverName: null, driverId: null, isLoading: false });
     }
   },
 
@@ -46,11 +56,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const driverData = response.data;
       const name = driverData.name || 'Driver';
+      const id: number = driverData.id;
 
-      // 3. Persist driver name
+      // 3. Persist driver name and ID
       await SecureStore.setItemAsync(DRIVER_NAME_KEY, name);
+      await SecureStore.setItemAsync(DRIVER_ID_KEY, String(id));
 
-      set({ activationCode: code, driverName: name });
+      set({ activationCode: code, driverName: name, driverId: id });
       return { success: true };
     } catch (e: any) {
       // Clean up stored code on failure
@@ -74,7 +86,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.warn("SecureStore failed to delete driver name:", e);
     }
 
-    set({ activationCode: null, driverName: null });
+    try {
+      await SecureStore.deleteItemAsync(DRIVER_ID_KEY);
+    } catch (e) {
+      console.warn("SecureStore failed to delete driver id:", e);
+    }
+
+    set({ activationCode: null, driverName: null, driverId: null });
     router.replace('/');
   },
 }));
