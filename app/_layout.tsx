@@ -7,6 +7,7 @@ import { View, StatusBar, LogBox } from "react-native";
 LogBox.ignoreAllLogs();
 import { ActivityIndicator } from "react-native-paper";
 import { PaperProvider, MD3DarkTheme } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Syncnox brand theme for React Native Paper
 const syncnoxTheme = {
@@ -39,7 +40,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (!isLoading) {
       if (activationCode) {
-        router.replace("/(home)/home");
+        router.replace("/(home)/(tabs)/home");
       } else {
         router.replace("/");
       }
@@ -67,7 +68,7 @@ export default function RootLayout() {
         screenOptions={{
           headerShown: false,
           animation: "slide_from_right",
-          contentStyle: { backgroundColor: "#001A0F" },
+          contentStyle: { backgroundColor: "#000000" },
         }}
       >
         <Stack.Screen name="index" options={{ animation: "fade" }} />

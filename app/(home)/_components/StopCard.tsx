@@ -1,13 +1,8 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { RouteStop } from '@/types/route.types';
-import {
-  formatTime,
-  getJobTypeLabel,
-  getJobTypeIcon,
-  getStopStatus,
-} from './homeScreen.utils';
+import React from "react";
+import { View, Text, TouchableOpacity } from "react-native";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { RouteStop } from "@/types/route.types";
+import { formatTime, getJobTypeLabel, getStopStatus } from "./homeScreen.utils";
 
 interface StopCardProps {
   stop: RouteStop;
@@ -16,92 +11,130 @@ interface StopCardProps {
 
 export default function StopCard({ stop, onPress }: StopCardProps) {
   const stopStatus = getStopStatus(stop);
-  const isDone = stopStatus !== 'pending';
-  const jobType = stop.job?.job_type || stop.stop_type || 'delivery';
-  const label = `${getJobTypeLabel(jobType)} — ${formatTime(stop.planned_arrival_time)}`;
-  const address = stop.job?.address_formatted || 'No address';
-  const duration = stop.job?.service_duration;
-  const stopNum = stop.sequence_order ?? '–';
+  const isDone = stopStatus !== "pending";
+  const jobType = stop.job?.job_type || stop.stop_type || "delivery";
 
+  // Format Label & Time
+  const jobLabel = getJobTypeLabel(jobType);
+  const timeLabel = formatTime(stop.planned_arrival_time);
+  const address = stop.job?.address_formatted || "No Address Provided";
+  const duration = stop.job?.service_duration;
+  const stopNum = stop.sequence_order ?? "–";
+
+  // Get Custom Icon based on Job Type
+  const getIcon = () => {
+    switch (jobType.toLowerCase()) {
+      case "pickup":
+        return (
+          <MaterialCommunityIcons
+            name="package-variant-minus"
+            size={24}
+            color="#6EB46E"
+          />
+        );
+      case "service":
+        return (
+          <MaterialCommunityIcons
+            name="wrench-clock"
+            size={22}
+            color="#6EB46E"
+          />
+        );
+      default:
+        return (
+          <MaterialCommunityIcons name="truck-fast" size={24} color="#6EB46E" />
+        );
+    }
+  };
+
+  // Color Mapping
   const dotColor =
-    stopStatus === 'completed' ? '#4ade80' :
-    stopStatus === 'failed'    ? '#f87171' :
-    '#9ca3af';
+    stopStatus === "completed"
+      ? "#4ade80"
+      : stopStatus === "failed"
+        ? "#f87171"
+        : "#6EB46E";
+
   const statusLabel =
-    stopStatus === 'completed' ? 'Completed' :
-    stopStatus === 'failed'    ? 'Failed'    :
-    null;
-  const statusColor = stopStatus === 'completed' ? '#4ade80' : '#f87171';
+    stopStatus === "completed"
+      ? "Completed"
+      : stopStatus === "failed"
+        ? "Failed"
+        : "Pending";
+
+  const statusColor =
+    stopStatus === "completed"
+      ? "#4ade80"
+      : stopStatus === "failed"
+        ? "#f87171"
+        : "rgba(255, 255, 255, 0.45)";
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7} className="mx-4 mb-2">
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      className="mx-4 mb-3.5"
+    >
       <View
-        className="flex-row items-center px-4 py-3 rounded-xl border border-white/[0.07]"
-        style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+        className="flex-row px-5 py-4.5 rounded-2xl border border-brand-green/20 shadow-md"
+        style={{
+          backgroundColor: "#1C1C1E",
+          shadowColor: "#000000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 6,
+          elevation: 5,
+          paddingVertical: 8,
+        }}
       >
-        {/* Sequence badge */}
+        {/* Left Column: Job Icon inside a circle */}
         <View
-          className="w-9 h-9 rounded-full items-center justify-center mr-3 flex-shrink-0"
-          style={{ backgroundColor: isDone ? 'rgba(255,255,255,0.06)' : 'rgba(110,180,110,0.18)' }}
+          className="w-12 h-12 rounded-full items-center justify-center mr-4.5 flex-shrink-0"
+          style={{ backgroundColor: "rgba(110, 180, 110, 0.08)" }}
         >
-          <Text
-            className="text-xs font-bold"
-            style={{ color: isDone ? 'rgba(255,255,255,0.4)' : '#6EB46E' }}
-          >
-            {stopNum}
-          </Text>
+          {getIcon()}
         </View>
 
-        {/* Content */}
-        <View className="flex-1 min-w-0">
-          {/* Title row */}
-          <View className="flex-row items-center gap-1.5 mb-0.5">
-            <Ionicons
-              name={getJobTypeIcon(jobType) as any}
-              size={13}
-              color={isDone ? 'rgba(255,255,255,0.35)' : '#6EB46E'}
-            />
+        {/* Right Column: Content */}
+        <View className="flex-1 min-w-0 justify-between">
+          {/* Top Row: Title + Chevron */}
+          <View className="flex-row items-center justify-between">
             <Text
-              className="text-[13px] font-semibold flex-shrink"
-              style={{ color: isDone ? 'rgba(255,255,255,0.45)' : '#ffffff' }}
+              className="text-[17px] font-bold text-white flex-1 mr-2"
               numberOfLines={1}
             >
-              {label}
+              {jobLabel} — {timeLabel}
             </Text>
+            <Ionicons name="chevron-forward" size={18} color="#6EB46E" />
           </View>
 
-          {/* Address */}
+          {/* Middle Row: Address */}
           <Text
-            className="text-xs mb-1.5"
-            style={{ color: 'rgba(255,255,255,0.45)' }}
-            numberOfLines={1}
+            className="text-[13.5px] text-white/55 my-2 leading-5"
+            numberOfLines={2}
           >
             {address}
           </Text>
 
-          {/* Bottom row: dot + stop # + duration | status label */}
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-1.5">
-              <View className="w-2 h-2 rounded-full" style={{ backgroundColor: dotColor }} />
-              <Text className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                Stop: {stopNum}{duration ? `  |  ${duration} min` : ''}
+          {/* Bottom Row: Dot + Stop Sequence | Duration & Status Label */}
+          <View className="flex-row items-center justify-between mt-1">
+            <View className="flex-row items-center gap-2">
+              <View
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: dotColor }}
+              />
+              <Text className="text-[12.5px] text-white/45 font-medium">
+                Stop: {stopNum} {duration ? `  |  ${duration} min` : ""}
               </Text>
             </View>
-            {statusLabel && (
-              <Text className="text-[11px] font-semibold" style={{ color: statusColor }}>
-                {statusLabel}
-              </Text>
-            )}
+            <Text
+              className="text-[12.5px] font-bold"
+              style={{ color: statusColor }}
+            >
+              {statusLabel}
+            </Text>
           </View>
         </View>
-
-        {/* Chevron */}
-        <Ionicons
-          name="chevron-forward"
-          size={16}
-          color="rgba(255,255,255,0.25)"
-          style={{ marginLeft: 8 }}
-        />
       </View>
     </TouchableOpacity>
   );

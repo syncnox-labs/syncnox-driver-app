@@ -47,3 +47,7 @@ export function getStopStatus(stop: RouteStop): 'completed' | 'failed' | 'pendin
   if (stop.job?.status === 'completed' || stop.actual_departure_time) return 'completed';
   return 'pending';
 }
+
+export default function DummyRouteComponent() {
+  return null;
+}

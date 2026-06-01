@@ -11,6 +11,7 @@ export interface StopJob {
   service_duration?: number; // minutes
   additional_notes?: string;
   status?: string; // "draft" | "assigned" | "in_transit" | "completed" | "failed"
+  location?: { lat: number; lng: number };
 }
 
 export interface RouteStop {
@@ -21,6 +22,8 @@ export interface RouteStop {
   actual_arrival_time?: string;
   actual_departure_time?: string;
   job?: StopJob;
+  location?: { lat: number; lng: number };
+  address_formatted?: string;
 }
 
 export interface AssignedRoute {

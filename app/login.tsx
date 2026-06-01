@@ -33,7 +33,7 @@ export default function LoginScreen() {
       await new Promise((r) => setTimeout(r, 800));
       const res = await login();
       if (res.success) {
-        router.replace("/(home)/home");
+        router.replace("/(home)/(tabs)/home");
       } else {
         setSnackbarMsg(
           res.error || "Failed to save your activation key. Please try again.",

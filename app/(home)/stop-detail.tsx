@@ -7,6 +7,8 @@ import {
   StatusBar,
   Alert,
   Linking,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,58 +24,174 @@ import {
   getStopStatus,
 } from './_components/homeScreen.utils';
 
-// ------------------------------------------------------------------ //
-// Detail row component
-// ------------------------------------------------------------------ //
+// ─────────────────────────────────────────────────────────────── //
+// Status configuration
+// ─────────────────────────────────────────────────────────────── //
 
-function DetailRow({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null;
+const STATUS_CONFIG = {
+  completed: {
+    color: '#34D399',
+    bg: 'rgba(52,211,153,0.1)',
+    border: 'rgba(52,211,153,0.25)',
+    label: 'Completed',
+    icon: 'checkmark-circle' as const,
+  },
+  failed: {
+    color: '#EF4444',
+    bg: 'rgba(239,68,68,0.1)',
+    border: 'rgba(239,68,68,0.25)',
+    label: 'Failed',
+    icon: 'close-circle' as const,
+  },
+  pending: {
+    color: '#6EB46E',
+    bg: 'rgba(110,180,110,0.1)',
+    border: 'rgba(110,180,110,0.25)',
+    label: 'Pending',
+    icon: 'time' as const,
+  },
+};
+
+// ─────────────────────────────────────────────────────────────── //
+// Section Header
+// ─────────────────────────────────────────────────────────────── //
+
+function SectionLabel({ title }: { title: string }) {
   return (
-    <View className="py-3.5 border-b border-white/[0.06]">
-      <Text className="text-[10px] font-bold tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
-        {label}
-      </Text>
-      <Text className="text-[15px]" style={{ color: 'rgba(255,255,255,0.85)' }}>
-        {value}
-      </Text>
-    </View>
+    <Text
+      style={{
+        color: 'rgba(245,242,235,0.35)',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 1.5,
+        marginBottom: 10,
+        marginTop: 20,
+      }}
+    >
+      {title}
+    </Text>
   );
 }
 
-// ------------------------------------------------------------------ //
-// Main screen
-// ------------------------------------------------------------------ //
+// ─────────────────────────────────────────────────────────────── //
+// Info Row
+// ─────────────────────────────────────────────────────────────── //
+
+function InfoRow({
+  icon,
+  label,
+  value,
+  valueColor,
+  onPress,
+  isLast,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  valueColor?: string;
+  onPress?: () => void;
+  isLast?: boolean;
+}) {
+  const content = (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        borderBottomWidth: isLast ? 0 : 1,
+        borderBottomColor: 'rgba(255,255,255,0.04)',
+      }}
+    >
+      <View
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          backgroundColor: 'rgba(110,180,110,0.06)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 12,
+        }}
+      >
+        <Ionicons name={icon} size={15} color="rgba(110,180,110,0.5)" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: 'rgba(245,242,235,0.4)', fontSize: 10, fontWeight: '600', letterSpacing: 0.5, marginBottom: 2 }}>
+          {label}
+        </Text>
+        <Text style={{ color: valueColor || '#F5F2EB', fontSize: 14, fontWeight: '500', lineHeight: 20 }}>
+          {value}
+        </Text>
+      </View>
+      {onPress && (
+        <Ionicons name="chevron-forward" size={14} color="rgba(110,180,110,0.4)" />
+      )}
+    </View>
+  );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+  return content;
+}
+
+// ─────────────────────────────────────────────────────────────── //
+// Main Screen
+// ─────────────────────────────────────────────────────────────── //
 
 export default function StopDetailScreen() {
   const { stopId } = useLocalSearchParams<{ stopId: string }>();
   const { assignedRoute, updateStopStatus } = useRouteStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const stop: RouteStop | undefined = useMemo(() =>
-    assignedRoute?.stops.find((s) => s.id === Number(stopId)),
-    [assignedRoute, stopId]
+  const stop: RouteStop | undefined = useMemo(
+    () => assignedRoute?.stops.find((s) => s.id === Number(stopId)),
+    [assignedRoute, stopId],
   );
 
+  // ── Not Found State ──
   if (!stop) {
     return (
-      <GradientBackground>
-        <SafeAreaView className="flex-1 items-center justify-center">
-          <Text className="text-white/60">Stop not found</Text>
+      <GradientBackground isBlack>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: 'rgba(110,180,110,0.08)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Ionicons name="alert-circle-outline" size={24} color="#6EB46E" />
+          </View>
+          <Text style={{ color: '#F5F2EB', fontSize: 16, fontWeight: '700', marginBottom: 4 }}>Stop Not Found</Text>
+          <Text style={{ color: 'rgba(245,242,235,0.4)', fontSize: 13 }}>This stop may have been removed.</Text>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={{ marginTop: 20, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: 'rgba(110,180,110,0.1)' }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ color: '#6EB46E', fontSize: 13, fontWeight: '600' }}>Go Back</Text>
+          </TouchableOpacity>
         </SafeAreaView>
       </GradientBackground>
     );
   }
 
-  // stop is narrowed to RouteStop here
+  // ── Data ──
   const job = stop.job;
   const jobType = job?.job_type || stop.stop_type || 'delivery';
   const stopStatus = getStopStatus(stop);
   const isDone = stopStatus !== 'pending';
+  const config = STATUS_CONFIG[stopStatus];
 
-  const customerName = [job?.first_name, job?.last_name].filter(Boolean).join(' ')
-    || job?.business_name
-    || null;
+  const customerName =
+    [job?.first_name, job?.last_name].filter(Boolean).join(' ') ||
+    job?.business_name ||
+    null;
 
+  const address =
+    stop.address_formatted || job?.address_formatted || null;
+
+  // ── Handlers ──
   async function handleStatusUpdate(id: number, newStatus: 'completed' | 'failed') {
     const actionLabel = newStatus === 'completed' ? 'Complete' : 'Mark as Failed';
     Alert.alert(
@@ -96,156 +214,427 @@ export default function StopDetailScreen() {
             }
           },
         },
-      ]
+      ],
     );
   }
 
   function handleNavigate() {
-    const address = encodeURIComponent(job?.address_formatted || '');
-    const url = `https://maps.google.com/?q=${address}`;
-    Linking.openURL(url).catch(() =>
-      Alert.alert('Error', 'Could not open maps application.')
-    );
+    if (!stop) return;
+    const lat = stop.location?.lat || job?.location?.lat;
+    const lng = stop.location?.lng || job?.location?.lng;
+    if (lat && lng) {
+      const url = Platform.select({
+        ios: `maps://app?daddr=${lat},${lng}`,
+        default: `google.navigation:q=${lat},${lng}`,
+      });
+      Linking.openURL(url!).catch(() =>
+        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`),
+      );
+    } else if (address) {
+      Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(address)}`).catch(() =>
+        Alert.alert('Error', 'Could not open maps application.'),
+      );
+    }
+  }
+
+  function handleCall() {
+    if (job?.phone_number) {
+      Linking.openURL(`tel:${job.phone_number}`);
+    }
   }
 
   return (
-    <GradientBackground>
+    <GradientBackground isBlack>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
 
-        {/* Header */}
-        <View className="flex-row items-center px-4 py-3 border-b border-white/[0.06]">
+        {/* ─── Header ─── */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: 'rgba(255,255,255,0.04)',
+          }}
+        >
           <TouchableOpacity
             onPress={() => router.back()}
-            className="w-9 h-9 rounded-full items-center justify-center mr-3"
-            style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 12,
+              backgroundColor: 'rgba(255,255,255,0.05)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: 12,
+            }}
+            activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={20} color="rgba(255,255,255,0.8)" />
+            <Ionicons name="arrow-back" size={18} color="#6EB46E" />
           </TouchableOpacity>
-          <Text className="text-white text-lg font-bold">Stop Details</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#F5F2EB', fontSize: 17, fontWeight: '700' }}>Stop Details</Text>
+          </View>
+          {/* Status badge in header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 5,
+              backgroundColor: config.bg,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: config.border,
+            }}
+          >
+            <Ionicons name={config.icon} size={12} color={config.color} />
+            <Text style={{ color: config.color, fontSize: 11, fontWeight: '700' }}>{config.label}</Text>
+          </View>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
-          {/* Type / time hero */}
-          <View className="items-center py-7 border-b border-white/[0.06] mx-4">
+          {/* ─── Hero Card ─── */}
+          <View style={{ marginHorizontal: 16, marginTop: 16 }}>
             <View
-              className="w-14 h-14 rounded-full items-center justify-center mb-3"
-              style={{ backgroundColor: isDone ? 'rgba(255,255,255,0.06)' : 'rgba(110,180,110,0.15)' }}
+              style={{
+                backgroundColor: '#0A0A0A',
+                borderRadius: 20,
+                overflow: 'hidden',
+                borderWidth: 1,
+                borderColor: 'rgba(110,180,110,0.1)',
+              }}
             >
-              <Ionicons
-                name={getJobTypeIcon(jobType)}
-                size={28}
-                color={isDone ? 'rgba(255,255,255,0.3)' : '#6EB46E'}
-              />
-            </View>
+              {/* Accent bar */}
+              <View style={{ height: 3, backgroundColor: config.color, opacity: 0.6 }} />
 
-            <Text className="text-white text-xl font-extrabold mb-1">
-              {getJobTypeLabel(jobType)}
-            </Text>
-
-            {stop.planned_arrival_time && (
-              <Text className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                Scheduled at:{' '}
-                <Text style={{ color: '#6EB46E', fontWeight: '700' }}>
-                  {formatTime(stop.planned_arrival_time)}
-                </Text>
-              </Text>
-            )}
-
-            {/* Done badge */}
-            {isDone && (
-              <View
-                className="flex-row items-center gap-1.5 mt-3 px-3 py-1 rounded-full"
-                style={{
-                  backgroundColor: stopStatus === 'completed'
-                    ? 'rgba(74,222,128,0.12)'
-                    : 'rgba(248,113,113,0.12)',
-                  borderWidth: 1,
-                  borderColor: stopStatus === 'completed' ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)',
-                }}
-              >
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                {/* Type icon */}
                 <View
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: stopStatus === 'completed' ? '#4ade80' : '#f87171' }}
-                />
-                <Text
-                  className="text-xs font-bold"
-                  style={{ color: stopStatus === 'completed' ? '#4ade80' : '#f87171' }}
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 16,
+                    backgroundColor: config.bg,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 14,
+                  }}
                 >
-                  {stopStatus === 'completed' ? 'Completed' : 'Failed'}
+                  <Ionicons name={getJobTypeIcon(jobType)} size={26} color={config.color} />
+                </View>
+
+                <Text style={{ color: '#F5F2EB', fontSize: 20, fontWeight: '800', marginBottom: 4 }}>
+                  {getJobTypeLabel(jobType)}
                 </Text>
+
+                {/* Scheduled time */}
+                {stop.planned_arrival_time && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                    <Ionicons name="time-outline" size={13} color="rgba(245,242,235,0.4)" />
+                    <Text style={{ color: 'rgba(245,242,235,0.5)', fontSize: 13 }}>
+                      Scheduled at{' '}
+                      <Text style={{ color: '#6EB46E', fontWeight: '700' }}>
+                        {formatTime(stop.planned_arrival_time)}
+                      </Text>
+                    </Text>
+                  </View>
+                )}
+
+                {/* Stop number */}
+                {stop.sequence_order && (
+                  <View
+                    style={{
+                      marginTop: 10,
+                      backgroundColor: 'rgba(255,255,255,0.04)',
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Text style={{ color: 'rgba(245,242,235,0.4)', fontSize: 11, fontWeight: '600' }}>
+                      Stop #{stop.sequence_order}
+                    </Text>
+                  </View>
+                )}
               </View>
-            )}
+            </View>
           </View>
 
-          {/* Action buttons — only for pending stops */}
+          {/* ─── Quick Actions (pending only) ─── */}
           {!isDone && (
-            <View className="flex-row gap-3 mx-4 mt-5 mb-2">
+            <View style={{ marginHorizontal: 16, marginTop: 16, flexDirection: 'row', gap: 10 }}>
+              {/* Navigate */}
               <TouchableOpacity
                 onPress={handleNavigate}
-                className="flex-1 flex-row items-center justify-center gap-2 py-3.5 rounded-xl"
-                style={{ backgroundColor: '#1a4a8a' }}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 7,
+                  paddingVertical: 14,
+                  borderRadius: 14,
+                  backgroundColor: '#6EB46E',
+                }}
                 activeOpacity={0.8}
               >
-                <Ionicons name="navigate-outline" size={18} color="#fff" />
-                <Text className="text-white font-semibold text-[13px]">Navigate</Text>
+                <Ionicons name="navigate" size={17} color="#000" />
+                <Text style={{ color: '#000', fontSize: 14, fontWeight: '700' }}>Navigate</Text>
               </TouchableOpacity>
 
+              {/* Complete */}
               <TouchableOpacity
                 onPress={() => handleStatusUpdate(stop.id, 'completed')}
                 disabled={isSubmitting}
-                className="flex-1 flex-row items-center justify-center gap-2 py-3.5 rounded-xl"
-                style={{ backgroundColor: '#166534', opacity: isSubmitting ? 0.6 : 1 }}
-                activeOpacity={0.8}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 7,
+                  paddingVertical: 14,
+                  borderRadius: 14,
+                  backgroundColor: 'rgba(110,180,110,0.1)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(110,180,110,0.2)',
+                  opacity: isSubmitting ? 0.5 : 1,
+                }}
+                activeOpacity={0.7}
               >
-                <Ionicons name="checkmark-circle-outline" size={18} color="#4ade80" />
-                <Text className="font-semibold text-[13px]" style={{ color: '#4ade80' }}>
-                  {isSubmitting ? 'Saving...' : 'Complete'}
-                </Text>
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#6EB46E" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={17} color="#6EB46E" />
+                    <Text style={{ color: '#6EB46E', fontSize: 14, fontWeight: '700' }}>Complete</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           )}
 
-          {/* Detail rows */}
-          <View className="mx-4 mt-4">
-            {customerName && <DetailRow label="CUSTOMER" value={customerName} />}
-            {job?.phone_number && (
-              <TouchableOpacity onPress={() => Linking.openURL(`tel:${job.phone_number}`)}>
-                <View className="py-3.5 border-b border-white/[0.06]">
-                  <Text className="text-[10px] font-bold tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                    PHONE
-                  </Text>
-                  <View className="flex-row items-center gap-2">
-                    <Text className="text-[15px]" style={{ color: '#6EB46E' }}>{job.phone_number}</Text>
-                    <Ionicons name="call-outline" size={14} color="#6EB46E" />
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )}
-            <DetailRow label="ADDRESS" value={job?.address_formatted} />
-            {job?.time_window_start && (
-              <DetailRow
-                label="TIME WINDOW"
-                value={`${job.time_window_start}${job.time_window_end ? ' – ' + job.time_window_end : ''}`}
-              />
-            )}
-            {job?.service_duration && (
-              <DetailRow label="DURATION" value={`${job.service_duration} minutes`} />
-            )}
-            <DetailRow label="NOTES" value={job?.additional_notes} />
-          </View>
+          {/* ─── Call Button (if phone available) ─── */}
+          {job?.phone_number && !isDone && (
+            <TouchableOpacity
+              onPress={handleCall}
+              style={{
+                marginHorizontal: 16,
+                marginTop: 10,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 7,
+                paddingVertical: 13,
+                borderRadius: 14,
+                backgroundColor: 'rgba(59,130,246,0.1)',
+                borderWidth: 1,
+                borderColor: 'rgba(59,130,246,0.2)',
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="call" size={16} color="#60A5FA" />
+              <Text style={{ color: '#60A5FA', fontSize: 14, fontWeight: '600' }}>
+                Call {customerName || 'Customer'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
-          {/* Mark Failed button — only for pending */}
+          {/* ─── Customer Information ─── */}
+          {(customerName || job?.phone_number || job?.business_name) && (
+            <View style={{ marginHorizontal: 16 }}>
+              <SectionLabel title="CUSTOMER INFORMATION" />
+              <View
+                style={{
+                  backgroundColor: '#0A0A0A',
+                  borderRadius: 16,
+                  paddingHorizontal: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(110,180,110,0.08)',
+                }}
+              >
+                {customerName && (
+                  <InfoRow
+                    icon="person"
+                    label="NAME"
+                    value={customerName}
+                    isLast={!job?.phone_number && !job?.business_name}
+                  />
+                )}
+                {job?.phone_number && (
+                  <InfoRow
+                    icon="call"
+                    label="PHONE"
+                    value={job.phone_number}
+                    valueColor="#60A5FA"
+                    onPress={handleCall}
+                    isLast={!job?.business_name}
+                  />
+                )}
+                {job?.business_name && customerName !== job.business_name && (
+                  <InfoRow
+                    icon="business"
+                    label="BUSINESS"
+                    value={job.business_name}
+                    isLast
+                  />
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* ─── Location ─── */}
+          {address && (
+            <View style={{ marginHorizontal: 16 }}>
+              <SectionLabel title="LOCATION" />
+              <TouchableOpacity
+                onPress={handleNavigate}
+                activeOpacity={0.7}
+                style={{
+                  backgroundColor: '#0A0A0A',
+                  borderRadius: 16,
+                  paddingHorizontal: 14,
+                  paddingVertical: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(110,180,110,0.08)',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+              >
+                <View
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    backgroundColor: 'rgba(110,180,110,0.06)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12,
+                  }}
+                >
+                  <Ionicons name="location" size={15} color="rgba(110,180,110,0.5)" />
+                </View>
+                <Text style={{ color: 'rgba(245,242,235,0.8)', fontSize: 14, lineHeight: 20, flex: 1 }}>
+                  {address}
+                </Text>
+                <Ionicons name="open-outline" size={14} color="rgba(110,180,110,0.35)" style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ─── Schedule Details ─── */}
+          {(job?.time_window_start || job?.service_duration || stop.actual_arrival_time || stop.actual_departure_time) && (
+            <View style={{ marginHorizontal: 16 }}>
+              <SectionLabel title="SCHEDULE" />
+              <View
+                style={{
+                  backgroundColor: '#0A0A0A',
+                  borderRadius: 16,
+                  paddingHorizontal: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(110,180,110,0.08)',
+                }}
+              >
+                {job?.time_window_start && (
+                  <InfoRow
+                    icon="calendar-outline"
+                    label="TIME WINDOW"
+                    value={`${formatTime(job.time_window_start)}${job.time_window_end ? ' – ' + formatTime(job.time_window_end) : ''}`}
+                    isLast={!job?.service_duration && !stop.actual_arrival_time && !stop.actual_departure_time}
+                  />
+                )}
+                {job?.service_duration && (
+                  <InfoRow
+                    icon="hourglass-outline"
+                    label="SERVICE DURATION"
+                    value={`${job.service_duration} min`}
+                    isLast={!stop.actual_arrival_time && !stop.actual_departure_time}
+                  />
+                )}
+                {stop.actual_arrival_time && (
+                  <InfoRow
+                    icon="enter-outline"
+                    label="ARRIVED AT"
+                    value={formatTime(stop.actual_arrival_time)}
+                    valueColor="#34D399"
+                    isLast={!stop.actual_departure_time}
+                  />
+                )}
+                {stop.actual_departure_time && (
+                  <InfoRow
+                    icon="exit-outline"
+                    label="DEPARTED AT"
+                    value={formatTime(stop.actual_departure_time)}
+                    valueColor="#34D399"
+                    isLast
+                  />
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* ─── Additional Notes ─── */}
+          {job?.additional_notes && (
+            <View style={{ marginHorizontal: 16 }}>
+              <SectionLabel title="NOTES" />
+              <View
+                style={{
+                  backgroundColor: '#0A0A0A',
+                  borderRadius: 16,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(110,180,110,0.08)',
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <View
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    backgroundColor: 'rgba(110,180,110,0.06)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12,
+                  }}
+                >
+                  <Ionicons name="document-text" size={15} color="rgba(110,180,110,0.5)" />
+                </View>
+                <Text style={{ color: 'rgba(245,242,235,0.7)', fontSize: 14, lineHeight: 21, flex: 1 }}>
+                  {job.additional_notes}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* ─── Mark Failed (pending only) ─── */}
           {!isDone && (
             <TouchableOpacity
               onPress={() => handleStatusUpdate(stop.id, 'failed')}
               disabled={isSubmitting}
-              className="mx-4 mt-6 py-3.5 rounded-xl items-center border"
-              style={{ borderColor: 'rgba(248,113,113,0.4)', opacity: isSubmitting ? 0.5 : 1 }}
-              activeOpacity={0.8}
+              style={{
+                marginHorizontal: 16,
+                marginTop: 24,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                paddingVertical: 14,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: 'rgba(239,68,68,0.2)',
+                backgroundColor: 'rgba(239,68,68,0.05)',
+                opacity: isSubmitting ? 0.4 : 1,
+              }}
+              activeOpacity={0.7}
             >
-              <Text className="font-semibold text-[13px]" style={{ color: '#f87171' }}>
+              <Ionicons name="close-circle-outline" size={16} color="#EF4444" />
+              <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '600' }}>
                 Mark as Failed
               </Text>
             </TouchableOpacity>

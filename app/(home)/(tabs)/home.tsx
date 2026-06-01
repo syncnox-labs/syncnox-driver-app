@@ -17,8 +17,8 @@ import SyncnoxMark from "@/components/SyncnoxMark";
 import { useAuthStore } from "@/store/auth.store";
 import { useRouteSocket } from "@/hooks/useRouteSocket";
 import { useRouteStore } from "@/store/route.store";
-import StopCard from "./_components/StopCard";
-import { isStopDone, getStopStatus } from "./_components/homeScreen.utils";
+import StopCard from "../_components/StopCard";
+import { isStopDone, getStopStatus } from "../_components/homeScreen.utils";
 
 // ------------------------------------------------------------------ //
 // Empty states
@@ -50,7 +50,7 @@ function EmptyTabState({ label }: { label: string }) {
       <Ionicons
         name="checkmark-circle-outline"
         size={44}
-        color="rgba(255,255,255,0.15)"
+        color="rgba(110, 180, 110, 0.4)"
       />
       <Text className="text-white/30 text-sm mt-3">{label}</Text>
     </View>
@@ -89,13 +89,13 @@ export default function HomeScreen() {
   const displayStops = activeTab === "todo" ? todoStops : doneStops;
 
   return (
-    <GradientBackground>
+    <GradientBackground isBlack>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
         translucent
       />
-      <SafeAreaView className="flex-1" edges={["top", "bottom"]}>
+      <SafeAreaView className="flex-1" edges={["top"]}>
         {/* ── Header ── */}
         <View className="flex-row items-center justify-between px-5 pt-2 pb-3">
           <View className="flex-row items-center gap-2">
@@ -123,8 +123,8 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {/* Logout */}
-            <TouchableOpacity
+            {/* Logout (quick shortcut, though also in settings tab) */}
+            {/* <TouchableOpacity
               onPress={handleLogout}
               className="w-9 h-9 rounded-full items-center justify-center"
               style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
@@ -133,9 +133,9 @@ export default function HomeScreen() {
               <Ionicons
                 name="log-out-outline"
                 size={18}
-                color="rgba(255,255,255,0.5)"
+                color="#6EB46E"
               />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
 
@@ -161,9 +161,9 @@ export default function HomeScreen() {
                 activeOpacity={0.7}
               >
                 <Text
-                  className="text-sm font-semibold"
+                  className="text-lg font-bold"
                   style={{
-                    color: isActive ? "#6EB46E" : "rgba(255,255,255,0.4)",
+                    color: isActive ? "#FFFFFF" : "rgba(255,255,255,0.4)",
                   }}
                 >
                   {tabLabel}
@@ -178,9 +178,9 @@ export default function HomeScreen() {
                     }}
                   >
                     <Text
-                      className="text-[10px] font-bold"
+                      className="text-[12px] font-bold"
                       style={{
-                        color: isActive ? "#6EB46E" : "rgba(255,255,255,0.4)",
+                        color: isActive ? "#FFFFFF" : "rgba(255,255,255,0.4)",
                       }}
                     >
                       {count}
@@ -208,13 +208,13 @@ export default function HomeScreen() {
             <View className="flex-row justify-between items-center px-5 mb-2">
               <Text
                 className="text-[10px] font-bold tracking-widest"
-                style={{ color: "rgba(255,255,255,0.3)" }}
+                style={{ color: "#FFFFFF" }}
               >
                 {activeTab === "todo" ? "UP NEXT" : "TODAY"}
               </Text>
               <Text
                 className="text-[10px] font-bold tracking-widest"
-                style={{ color: "rgba(255,255,255,0.3)" }}
+                style={{ color: "#ffffff" }}
               >
                 {completedCount}/{totalStops} COMPLETED
               </Text>
