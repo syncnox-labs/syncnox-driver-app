@@ -68,7 +68,7 @@ export default function LoginScreen() {
             <Ionicons
               name="arrow-back"
               size={22}
-              color="rgba(255,255,255,0.85)"
+              color="#E5ECE9"
             />
           </TouchableOpacity>
 
@@ -79,7 +79,7 @@ export default function LoginScreen() {
           >
             {/* Header — centered like Optimo */}
             <View className="items-center mb-14 mt-6">
-              <Text className="text-white text-[28px] font-extrabold tracking-tight text-center">
+              <Text className="text-text-primary text-[28px] font-extrabold tracking-tight text-center">
                 Enter Activation Key
               </Text>
             </View>
@@ -87,13 +87,13 @@ export default function LoginScreen() {
             {/* Code input block */}
             <View className="items-center mb-2 mt-16">
               <CodeInput value={code} onChange={(v) => { setCode(v); setSnackbarMsg(""); }} autoFocus />
-              <Text className="text-white/40 text-sm text-center mt-3">
+              <Text className="text-text-muted text-sm text-center mt-3">
                 Enter your key here
               </Text>
             </View>
 
             <View>
-              <Text className="text-red-700 text-sm text-center mt-3">
+              <Text className="text-error text-sm text-center mt-3">
                 {snackbarMsg || ""}
               </Text>
             </View>
@@ -110,7 +110,7 @@ export default function LoginScreen() {
               style={
                 canActivate
                   ? {
-                      shadowColor: "#6EB46E",
+                      shadowColor: "#5EC299",
                       shadowOffset: { width: 0, height: 4 },
                       shadowOpacity: 0.4,
                       shadowRadius: 12,
@@ -145,9 +145,9 @@ export default function LoginScreen() {
             </TouchableOpacity> */}
 
             {/* Help text */}
-            <Text className="text-white/55 text-[13px] leading-5 mt-10">
-              <Text className="text-white font-bold">
-                Can't find your key?{" "}
+            <Text className="text-text-secondary text-[13px] leading-5 mt-10">
+              <Text className="text-text-primary font-bold">
+                {"Can't find your key? "}
               </Text>
               Ask your dispatcher to send it to you. If you are an
               Administrator, you can get an activation key from the Syncnox web

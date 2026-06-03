@@ -14,14 +14,14 @@ const syncnoxTheme = {
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: "#6EB46E",
-    secondary: "#003220",
-    background: "#001A0F",
-    surface: "#0D2E1A",
+    primary: "#5EC299",
+    secondary: "#0B291B",
+    background: "#0D0F0E",
+    surface: "#19201E",
     onPrimary: "#FFFFFF",
-    onBackground: "#FFFFFF",
-    onSurface: "#FFFFFF",
-    error: "#ff4d4f",
+    onBackground: "#E5ECE9",
+    onSurface: "#E5ECE9",
+    error: "#E05D61",
   },
 };
 
@@ -51,7 +51,7 @@ export default function RootLayout() {
     return (
       <PaperProvider theme={syncnoxTheme}>
         <View className="flex-1 bg-bg-deep items-center justify-center">
-          <ActivityIndicator color="#6EB46E" size="large" />
+          <ActivityIndicator color="#5EC299" size="large" />
         </View>
       </PaperProvider>
     );

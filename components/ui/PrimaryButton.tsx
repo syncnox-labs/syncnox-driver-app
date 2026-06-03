@@ -38,7 +38,7 @@ export default function PrimaryButton({
           justifyContent: 'center',
         },
         variant === 'outline' && {
-          borderColor: '#6EB46E',
+          borderColor: '#5EC299',
           borderWidth: 1.5,
         },
         style,
@@ -48,10 +48,10 @@ export default function PrimaryButton({
         fontSize: 16,
         fontWeight: '600',
         letterSpacing: 0.3,
-        color: '#FFFFFF',
+        color: variant === 'filled' ? '#0B291B' : '#E5ECE9',
       }}
-      buttonColor={variant === 'filled' ? '#6EB46E' : 'transparent'}
-      rippleColor="rgba(110,180,110,0.25)"
+      buttonColor={variant === 'filled' ? '#5EC299' : 'transparent'}
+      rippleColor="rgba(94,194,153,0.25)"
     >
       {label}
     </PaperButton>

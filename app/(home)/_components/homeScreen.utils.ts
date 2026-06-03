@@ -22,14 +22,6 @@ export function getJobTypeLabel(jobType?: string): string {
   }
 }
 
-export function getJobTypeIcon(jobType?: string): any {
-  switch (jobType?.toLowerCase()) {
-    case 'pickup': return 'return-up-back-outline';
-    case 'service': return 'construct-outline';
-    default: return 'cube-outline';
-  }
-}
-
 // ─────────────────────────────────────────────────────────────── //
 // Stop status helpers
 // ─────────────────────────────────────────────────────────────── //

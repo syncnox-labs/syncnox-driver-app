@@ -29,7 +29,7 @@ export default function StopCard({ stop, onPress }: StopCardProps) {
           <MaterialCommunityIcons
             name="package-variant-minus"
             size={24}
-            color="#6EB46E"
+            color="#5EC299"
           />
         );
       case "service":
@@ -37,12 +37,12 @@ export default function StopCard({ stop, onPress }: StopCardProps) {
           <MaterialCommunityIcons
             name="wrench-clock"
             size={22}
-            color="#6EB46E"
+            color="#5EC299"
           />
         );
       default:
         return (
-          <MaterialCommunityIcons name="truck-fast" size={24} color="#6EB46E" />
+          <MaterialCommunityIcons name="truck-fast" size={24} color="#5EC299" />
         );
     }
   };
@@ -50,10 +50,10 @@ export default function StopCard({ stop, onPress }: StopCardProps) {
   // Color Mapping
   const dotColor =
     stopStatus === "completed"
-      ? "#4ade80"
+      ? "#5EC299"
       : stopStatus === "failed"
-        ? "#f87171"
-        : "#6EB46E";
+        ? "#E05D61"
+        : "#5EC299";
 
   const statusLabel =
     stopStatus === "completed"
@@ -64,10 +64,10 @@ export default function StopCard({ stop, onPress }: StopCardProps) {
 
   const statusColor =
     stopStatus === "completed"
-      ? "#4ade80"
+      ? "#5EC299"
       : stopStatus === "failed"
-        ? "#f87171"
-        : "rgba(255, 255, 255, 0.45)";
+        ? "#E05D61"
+        : "rgba(229, 236, 233, 0.45)";
 
   return (
     <TouchableOpacity
@@ -78,7 +78,8 @@ export default function StopCard({ stop, onPress }: StopCardProps) {
       <View
         className="flex-row px-5 py-4.5 rounded-2xl border border-brand-green/20 shadow-md"
         style={{
-          backgroundColor: "#1C1C1E",
+          // backgroundColor: "#19201E",
+          backgroundColor: "#0B291B",
           shadowColor: "#000000",
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.3,
@@ -90,7 +91,7 @@ export default function StopCard({ stop, onPress }: StopCardProps) {
         {/* Left Column: Job Icon inside a circle */}
         <View
           className="w-12 h-12 rounded-full items-center justify-center mr-4.5 flex-shrink-0"
-          style={{ backgroundColor: "rgba(110, 180, 110, 0.08)" }}
+          style={{ backgroundColor: "rgba(94, 194, 153, 0.08)" }}
         >
           {getIcon()}
         </View>
@@ -100,17 +101,17 @@ export default function StopCard({ stop, onPress }: StopCardProps) {
           {/* Top Row: Title + Chevron */}
           <View className="flex-row items-center justify-between">
             <Text
-              className="text-[17px] font-bold text-white flex-1 mr-2"
+              className="text-[17px] font-bold text-text-primary flex-1 mr-2"
               numberOfLines={1}
             >
               {jobLabel} — {timeLabel}
             </Text>
-            <Ionicons name="chevron-forward" size={18} color="#6EB46E" />
+            <Ionicons name="chevron-forward" size={18} color="#5EC299" />
           </View>
 
           {/* Middle Row: Address */}
           <Text
-            className="text-[13.5px] text-white/55 my-2 leading-5"
+            className="text-[13.5px] text-text-secondary my-2 leading-5"
             numberOfLines={2}
           >
             {address}
@@ -123,7 +124,7 @@ export default function StopCard({ stop, onPress }: StopCardProps) {
                 className="w-2.5 h-2.5 rounded-full"
                 style={{ backgroundColor: dotColor }}
               />
-              <Text className="text-[12.5px] text-white/45 font-medium">
+              <Text className="text-[12.5px] text-text-muted font-medium">
                 Stop: {stopNum} {duration ? `  |  ${duration} min` : ""}
               </Text>
             </View>

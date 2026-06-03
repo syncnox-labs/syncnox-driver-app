@@ -11,27 +11,32 @@ module.exports = {
       colors: {
         // Syncnox brand — from theme.config.ts + logo SVG
         primary: {
-          DEFAULT: '#003220',
-          dark: '#002A00',
-          light: '#6EB46E',
+          DEFAULT: '#0B291B',
+          dark: '#071C12',
+          light: '#5EC299',
         },
         brand: {
-          green: '#6EB46E',
-          'green-dark': '#4E9A4E',
-          'green-muted': 'rgba(110,180,110,0.35)',
+          green: '#5EC299',
+          'green-dark': '#4AB087',
+          'green-muted': 'rgba(94,194,153,0.30)',
         },
         bg: {
-          deep: '#001A0F',
-          mid: '#003220',
-          card: '#0D2E1A',
-          input: '#0A2216',
-          'input-focus': '#0F3520',
+          deep: '#0D0F0E',
+          mid: '#131917',
+          card: '#19201E',
+          input: '#131917',
+          'input-focus': '#1E2623',
         },
         border: {
-          subtle: 'rgba(110,180,110,0.20)',
-          focus: '#6EB46E',
+          subtle: 'rgba(94,194,153,0.15)',
+          focus: '#5EC299',
         },
-        error: '#ff4d4f',
+        text: {
+          primary: '#E5ECE9',
+          secondary: 'rgba(229,236,233,0.65)',
+          muted: 'rgba(229,236,233,0.40)',
+        },
+        error: '#E05D61',
         warning: '#faad14',
       },
       fontFamily: {

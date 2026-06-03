@@ -79,11 +79,11 @@ export default function WelcomeScreen() {
           >
             <View
               className="w-40 h-40 rounded-full items-center justify-center border border-brand-green/15"
-              style={{ backgroundColor: "rgba(110,180,110,0.08)" }}
+              style={{ backgroundColor: "rgba(94,194,153,0.08)" }}
             >
               <View
                 className="w-28 h-28 rounded-full items-center justify-center border border-brand-green/25"
-                style={{ backgroundColor: "rgba(110,180,110,0.12)" }}
+                style={{ backgroundColor: "rgba(94,194,153,0.12)" }}
               >
                 <SyncnoxMark size={72} />
               </View>
@@ -109,10 +109,10 @@ export default function WelcomeScreen() {
           }}
           className="pb-8"
         >
-          <Text className="text-white text-4xl font-extrabold tracking-tight mb-3">
+          <Text className="text-text-primary text-4xl font-extrabold tracking-tight mb-3">
             Syncnox Driver
           </Text>
-          <Text className="text-white/60 text-[15px] leading-6 mb-6">
+          <Text className="text-text-secondary text-[15px] leading-6 mb-6">
             Smart delivery management for drivers.{"\n"}
             Receive routes from your dispatcher and{"\n"}
             track every stop seamlessly.
@@ -125,7 +125,7 @@ export default function WelcomeScreen() {
                 <View
                   key={label}
                   className="border border-brand-green/25 rounded-full px-3 py-1"
-                  style={{ backgroundColor: "rgba(110,180,110,0.12)" }}
+                  style={{ backgroundColor: "rgba(94,194,153,0.12)" }}
                 >
                   <Text className="text-primary-light text-xs font-medium">
                     {label}
@@ -145,7 +145,7 @@ export default function WelcomeScreen() {
             label="I have an activation key"
             onPress={() => router.push("/login")}
             style={{
-              shadowColor: "#6EB46E",
+              shadowColor: "#5EC299",
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.4,
               shadowRadius: 12,

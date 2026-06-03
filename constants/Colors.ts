@@ -1,45 +1,47 @@
 /**
- * Syncnox brand color tokens — derived from syncnox-fe/config/theme.config.ts
+ * Syncnox brand color tokens — Eye-pleasing and drive-safe palette
+ * Modified to avoid high contrast eye-strain (neon-on-black).
+ * Uses a soft mint green and deep warm slate-gray backgrounds.
  */
 export const Colors = {
-  // Brand greens (from logo.svg paths + theme.config.ts colorPrimary)
-  primary: '#003220',
-  primaryDark: '#002A00',
-  primaryLight: '#6EB46E',
+  // Brand greens
+  primary: '#0B291B',         // Deep forest slate green
+  primaryDark: '#071C12',     // Sober dark forest
+  primaryLight: '#5EC299',    // Soft mint green (soothing, highly legible)
 
-  // Full-screen gradient stops
-  gradientStart: '#001A0F',
-  gradientMid: '#003220',
-  gradientEnd: '#004D2E',
+  // Full-screen gradient stops (charcoal slate with a touch of deep green)
+  gradientStart: '#0D0F0E',   // Softest dark background
+  gradientMid: '#131917',     // Dark slate gray-green
+  gradientEnd: '#19201E',     // Soft charcoal slate
 
-  // Surface / card backgrounds
-  bgCard: '#0D2E1A',
-  bgInput: '#0A2216',
-  bgInputFocused: '#0F3520',
+  // Surface / card backgrounds (soothing dark gray-green tones instead of pure dark green)
+  bgCard: '#19201E',
+  bgInput: '#131917',
+  bgInputFocused: '#1E2623',
 
-  // Text
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255,255,255,0.60)',
-  textMuted: 'rgba(255,255,255,0.35)',
-  textPlaceholder: 'rgba(255,255,255,0.25)',
+  // Text (soft off-white to reduce glare and haloing while driving)
+  textPrimary: '#E5ECE9',
+  textSecondary: 'rgba(229,236,233,0.65)',
+  textMuted: 'rgba(229,236,233,0.40)',
+  textPlaceholder: 'rgba(229,236,233,0.25)',
 
   // CTA / interactive
-  accentGreen: '#6EB46E',
-  accentGreenDark: '#4E9A4E',
-  accentGreenDisabled: 'rgba(110,180,110,0.35)',
+  accentGreen: '#5EC299',
+  accentGreenDark: '#4AB087',
+  accentGreenDisabled: 'rgba(94,194,153,0.30)',
 
   // Borders
-  borderSubtle: 'rgba(110,180,110,0.20)',
-  borderFocus: '#6EB46E',
-  borderActive: '#003220',
+  borderSubtle: 'rgba(94,194,153,0.15)',
+  borderFocus: '#5EC299',
+  borderActive: '#0B291B',
 
   // Separators
-  separator: 'rgba(255,255,255,0.08)',
+  separator: 'rgba(255,255,255,0.06)',
 
   // Status
-  error: '#ff4d4f',
+  error: '#E05D61',
   warning: '#faad14',
-  success: '#6EB46E',
+  success: '#5EC299',
 
   // Misc
   white: '#FFFFFF',

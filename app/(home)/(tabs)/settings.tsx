@@ -23,7 +23,7 @@ function SectionHeader({ title }: { title: string }) {
   return (
     <Text
       className="text-[10px] font-bold tracking-widest px-5 mt-6 mb-2 uppercase"
-      style={{ color: "rgba(255,255,255,0.3)" }}
+      style={{ color: "rgba(229,236,233,0.3)" }}
     >
       {title}
     </Text>
@@ -50,18 +50,18 @@ function SettingRow({
   const content = (
     <View
       className="flex-row items-center justify-between py-4 px-5 border-b border-white/[0.05]"
-      style={{ backgroundColor: "#1C1C1E" }}
+      style={{ backgroundColor: "#19201E" }}
     >
       <View className="flex-row items-center gap-3.5">
         <Ionicons
           name={icon}
           size={18}
-          color={isDestructive ? "#ff4d4f" : "#6EB46E"}
+          color={isDestructive ? "#E05D61" : "#5EC299"}
         />
         <Text
           className="text-[15px] font-medium"
           style={{
-            color: isDestructive ? "#ff4d4f" : "rgba(255,255,255,0.85)",
+            color: isDestructive ? "#E05D61" : "#E5ECE9",
           }}
         >
           {label}
@@ -70,11 +70,11 @@ function SettingRow({
 
       <View className="flex-row items-center gap-2">
         {value && (
-          <Text className="text-xs text-white/40 font-semibold">{value}</Text>
+          <Text className="text-xs text-text-muted font-semibold">{value}</Text>
         )}
         {rightElement}
         {onPress && !rightElement && (
-          <Ionicons name="chevron-forward" size={16} color="#6EB46E" />
+          <Ionicons name="chevron-forward" size={16} color="#5EC299" />
         )}
       </View>
     </View>
@@ -157,7 +157,7 @@ export default function SettingsTabScreen() {
         <View className="flex-row items-center justify-between px-5 pt-2 pb-3 border-b border-white/[0.05]">
           <View className="flex-row items-center gap-2">
             <SyncnoxMark size={24} />
-            <Text className="text-white text-xl font-extrabold tracking-tight">
+            <Text className="text-text-primary text-xl font-extrabold tracking-tight">
               Settings
             </Text>
           </View>
@@ -177,9 +177,9 @@ export default function SettingsTabScreen() {
                 disabled={true}
                 value={workingNow}
                 onValueChange={setWorkingNow}
-                trackColor={{ false: "#1a1a1a", true: "#166534" }}
-                thumbColor={workingNow ? "#6EB46E" : "#9ca3af"}
-                ios_backgroundColor="#1a1a1a"
+                trackColor={{ false: "#131917", true: "#0B291B" }}
+                thumbColor={workingNow ? "#5EC299" : "#8E9491"}
+                ios_backgroundColor="#131917"
               />
             }
           />
@@ -193,8 +193,8 @@ export default function SettingsTabScreen() {
               <Switch
                 value={useCircleMarkers}
                 onValueChange={setUseCircleMarkers}
-                trackColor={{ false: "#1a1a1a", true: "#166534" }}
-                thumbColor={useCircleMarkers ? "#6EB46E" : "#9ca3af"}
+                trackColor={{ false: "#1a1a1a", true: "rgba(94,194,153,0.3)" }}
+                thumbColor={useCircleMarkers ? "#5EC299" : "#9ca3af"}
                 ios_backgroundColor="#1a1a1a"
               />
             }

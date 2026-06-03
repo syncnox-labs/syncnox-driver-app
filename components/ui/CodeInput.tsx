@@ -130,7 +130,7 @@ export default function CodeInput({ value, onChange, autoFocus = false }: CodeIn
                     style={{ width: cellWidth, alignItems: 'center', justifyContent: 'center' }}
                   >
                     <Text
-                      style={{ fontSize, fontWeight: '700', color: isFilled ? '#FFFFFF' : 'rgba(255,255,255,0.25)' }}
+                      style={{ fontSize, fontWeight: '700', color: isFilled ? '#E5ECE9' : 'rgba(229,236,233,0.25)' }}
                     >
                       {isFilled ? char : '_'}
                     </Text>
@@ -142,7 +142,7 @@ export default function CodeInput({ value, onChange, autoFocus = false }: CodeIn
                           alignSelf: 'center',
                           width: 2,
                           height: fontSize * 0.8,
-                          backgroundColor: '#6EB46E',
+                          backgroundColor: '#5EC299',
                           borderRadius: 1,
                           opacity: blinkAnim,
                         }}
