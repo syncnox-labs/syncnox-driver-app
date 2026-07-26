@@ -79,11 +79,11 @@ export default function WelcomeScreen() {
           >
             <View
               className="w-40 h-40 rounded-full items-center justify-center border border-brand-green/15"
-              style={{ backgroundColor: "rgba(94,194,153,0.08)" }}
+              style={{ backgroundColor: "rgba(48,209,88,0.08)" }}
             >
               <View
                 className="w-28 h-28 rounded-full items-center justify-center border border-brand-green/25"
-                style={{ backgroundColor: "rgba(94,194,153,0.12)" }}
+                style={{ backgroundColor: "rgba(48,209,88,0.12)" }}
               >
                 <SyncnoxMark size={72} />
               </View>
@@ -123,9 +123,9 @@ export default function WelcomeScreen() {
             {["📍 Live Routes", "✅ Stop Tracking", "🔒 Secure"].map(
               (label) => (
                 <View
-                  key={label}
-                  className="border border-brand-green/25 rounded-full px-3 py-1"
-                  style={{ backgroundColor: "rgba(94,194,153,0.12)" }}
+                   key={label}
+                   className="border border-brand-green/25 rounded-full px-3 py-1"
+                   style={{ backgroundColor: "rgba(48,209,88,0.12)" }}
                 >
                   <Text className="text-primary-light text-xs font-medium">
                     {label}
@@ -145,7 +145,7 @@ export default function WelcomeScreen() {
             label="I have an activation key"
             onPress={() => router.push("/login")}
             style={{
-              shadowColor: "#5EC299",
+              shadowColor: "#30D158",
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.4,
               shadowRadius: 12,

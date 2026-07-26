@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
@@ -10,152 +11,193 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import GradientBackground from "@/components/ui/GradientBackground";
-import PrimaryButton from "@/components/ui/PrimaryButton";
-import CodeInput from "@/components/ui/CodeInput";
+import Svg, { Path, Circle } from "react-native-svg";
 import { useAuthStore } from "@/store/auth.store";
 
-const REQUIRED_LENGTH = 12;
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+const G = '#30D158';
+
+// ─── Logo Mark ────────────────────────────────────────────────────────────────
+function LogoMark() {
+  return (
+    <View
+      style={{
+        width: 64,
+        height: 64,
+        borderRadius: 18,
+        backgroundColor: G,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 24,
+      }}
+    >
+      <Svg width={32} height={32} viewBox="0 0 32 32" fill="none">
+        <Path
+          d="M6 22L16 8L26 22"
+          stroke="#000"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <Circle cx="16" cy="8" r="2" fill="#000" />
+        <Path d="M10 22H22" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
+      </Svg>
+    </View>
+  );
+}
 
 export default function LoginScreen() {
   const { login, setCode, code } = useAuthStore();
   const [loading, setLoading] = useState(false);
-  const [snackbarMsg, setSnackbarMsg] = useState("");
-
-  const isComplete = code.length === REQUIRED_LENGTH;
-  const canActivate = isComplete;
+  const [error, setError] = useState('');
+  const [focused, setFocused] = useState(false);
 
   const handleActivate = async () => {
-    if (!canActivate) return;
+    if (!code.trim()) {
+      setError('Activation key is required');
+      return;
+    }
     setLoading(true);
+    setError('');
     try {
       await new Promise((r) => setTimeout(r, 800));
       const res = await login();
       if (res.success) {
-        router.replace("/(home)/(tabs)/home");
+        router.replace('/(home)/(tabs)/home');
       } else {
-        setSnackbarMsg(
-          res.error || "Failed to save your activation key. Please try again.",
-        );
+        setError(res.error || 'Invalid key. Contact your dispatcher.');
       }
     } catch {
-      setSnackbarMsg("Something went wrong. Please try again.");
+      setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <GradientBackground>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
-      <SafeAreaView className="flex-1" edges={["top", "bottom"]}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1"
-        >
-          {/* Back button — outside scroll, always top-left */}
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="mt-2 ml-5 w-[38px] h-[38px] rounded-full bg-white/[0.08] items-center justify-center"
-            activeOpacity={0.7}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Ionicons
-              name="arrow-back"
-              size={22}
-              color="#E5ECE9"
-            />
-          </TouchableOpacity>
-
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView
-            contentContainerClassName="px-6 pt-8 pb-6"
+            contentContainerStyle={{ flexGrow: 1 }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Header — centered like Optimo */}
-            <View className="items-center mb-14 mt-6">
-              <Text className="text-text-primary text-[28px] font-extrabold tracking-tight text-center">
-                Enter Activation Key
-              </Text>
-            </View>
-
-            {/* Code input block */}
-            <View className="items-center mb-2 mt-16">
-              <CodeInput value={code} onChange={(v) => { setCode(v); setSnackbarMsg(""); }} autoFocus />
-              <Text className="text-text-muted text-sm text-center mt-3">
-                Enter your key here
-              </Text>
-            </View>
-
-            <View>
-              <Text className="text-error text-sm text-center mt-3">
-                {snackbarMsg || ""}
-              </Text>
-            </View>
-
-            {/* Spacer */}
-            <View className="h-20" />
-
-            {/* Activate button */}
-            <PrimaryButton
-              label="Activate"
-              onPress={handleActivate}
-              disabled={!canActivate}
-              loading={loading}
-              style={
-                canActivate
-                  ? {
-                      shadowColor: "#5EC299",
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.4,
-                      shadowRadius: 12,
-                      elevation: 8,
-                    }
-                  : undefined
-              }
-            />
-
-            {/* <TouchableOpacity
-              className="flex-row items-center gap-2.5 mt-4 mb-6"
-              onPress={() => setTermsAccepted((v) => !v)}
-              activeOpacity={0.8}
-            >
-              <View
-                className={`w-[22px] h-[22px] rounded-md border-[1.5px] items-center justify-center flex-shrink-0 ${
-                  termsAccepted
-                    ? "bg-primary border-primary-light"
-                    : "bg-bg-input border-brand-green/35"
-                }`}
-              >
-                {termsAccepted && (
-                  <Ionicons name="checkmark" size={13} color="white" />
-                )}
-              </View>
-              <Text className="text-white/60 text-[13px] leading-5 flex-1">
-                I agree to Syncnox's{" "}
-                <Text className="text-primary-light font-semibold">
-                  Terms of Service
+            {/* ── Main content ── */}
+            <View style={{ flex: 1, paddingHorizontal: 32, justifyContent: 'center', paddingBottom: 40, paddingTop: 60 }}>
+              {/* Logo + headline */}
+              <View style={{ marginBottom: 40 }}>
+                <LogoMark />
+                <Text
+                  style={{
+                    fontSize: 34,
+                    fontWeight: '700',
+                    color: '#fff',
+                    letterSpacing: -1,
+                    lineHeight: 40,
+                    marginBottom: 8,
+                  }}
+                >
+                  Syncnox Driver
                 </Text>
-              </Text>
-            </TouchableOpacity> */}
+                <Text style={{ fontSize: 17, color: '#8E8E93', fontWeight: '400', lineHeight: 24 }}>
+                  Enter the activation key provided by your fleet dispatcher.
+                </Text>
+              </View>
 
-            {/* Help text */}
-            <Text className="text-text-secondary text-[13px] leading-5 mt-10">
-              <Text className="text-text-primary font-bold">
-                {"Can't find your key? "}
+              {/* Input */}
+              <View style={{ marginBottom: error ? 4 : 16 }}>
+                <View
+                  style={{
+                    backgroundColor: '#1C1C1E',
+                    borderRadius: 14,
+                    borderWidth: 1.5,
+                    borderColor: focused ? G : 'transparent',
+                    height: 56,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  <TextInput
+                    value={code}
+                    onChangeText={(v) => { setCode(v); setError(''); }}
+                    onFocus={() => setFocused(true)}
+                    onBlur={() => setFocused(false)}
+                    onSubmitEditing={handleActivate}
+                    placeholder="e.g. DRV-2024-DEMO"
+                    placeholderTextColor="#3A3A3C"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    style={{
+                      flex: 1,
+                      backgroundColor: 'transparent',
+                      fontSize: 17,
+                      fontWeight: '500',
+                      color: '#fff',
+                      fontFamily: 'monospace',
+                      letterSpacing: 1,
+                    }}
+                  />
+                </View>
+              </View>
+
+              {/* Error */}
+              {!!error && (
+                <Text style={{ fontSize: 13, color: '#FF453A', marginBottom: 12, paddingLeft: 4 }}>
+                  {error}
+                </Text>
+              )}
+
+              {/* Activate button */}
+              <TouchableOpacity
+                onPress={handleActivate}
+                disabled={loading}
+                activeOpacity={0.85}
+                style={{
+                  height: 56,
+                  borderRadius: 14,
+                  backgroundColor: loading ? '#3A3A3C' : G,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: loading ? 'transparent' : G,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.4,
+                  shadowRadius: 12,
+                  elevation: loading ? 0 : 8,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 17,
+                    fontWeight: '600',
+                    color: loading ? '#8E8E93' : '#000',
+                    letterSpacing: -0.2,
+                  }}
+                >
+                  {loading ? 'Activating…' : 'Activate Device'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* ── Footer ── */}
+            <View style={{ paddingHorizontal: 32, paddingBottom: 32, gap: 20 }}>
+              <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 13, color: '#8E8E93' }}>Need a key?</Text>
+                <TouchableOpacity activeOpacity={0.7}>
+                  <Text style={{ fontSize: 13, color: G, fontWeight: '500' }}>Contact Dispatcher →</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={{ fontSize: 12, color: '#3A3A3C', textAlign: 'center' }}>
+                Encrypted · GDPR compliant · Offline capable
               </Text>
-              Ask your dispatcher to send it to you. If you are an
-              Administrator, you can get an activation key from the Syncnox web
-              dashboard.
-            </Text>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </GradientBackground>
+    </View>
   );
 }

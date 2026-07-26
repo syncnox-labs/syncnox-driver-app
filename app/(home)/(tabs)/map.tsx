@@ -395,9 +395,9 @@ export default function MapTabScreen() {
 
     if (isDepot) {
       return {
-        bg: isSelected ? "#5EC299" : "#4A5568", // Mint if selected, Slate Grey if unselected
+        bg: isSelected ? "#30D158" : "#4A5568", // iOS Green if selected, Slate Grey if unselected
         border: "#FFFFFF",
-        text: isSelected ? "#0B291B" : "#FFFFFF",
+        text: isSelected ? "#000000" : "#FFFFFF",
         size: isSelected ? 38 : 32,
         icon: "home" as const,
         iconSize: isSelected ? 16 : 13,
@@ -406,8 +406,8 @@ export default function MapTabScreen() {
     }
     if (status === "completed") {
       return {
-        bg: isSelected ? "#5EC299" : "#FFFFFF",
-        border: isSelected ? "#FFFFFF" : "#5EC299", // ← mint border so stem is visible
+        bg: isSelected ? "#30D158" : "#FFFFFF",
+        border: isSelected ? "#FFFFFF" : "#30D158", // iOS Green border so stem is visible
         text: "#000000",
         size: isSelected ? 38 : 32,
         icon: undefined,
@@ -417,9 +417,9 @@ export default function MapTabScreen() {
     }
     if (status === "failed") {
       return {
-        bg: isSelected ? "#5EC299" : "#E05D61", // Mint if selected, soft Red if failed
+        bg: isSelected ? "#30D158" : "#FF453A", // iOS Green if selected, iOS Red if failed
         border: "#FFFFFF",
-        text: isSelected ? "#0B291B" : "#FFFFFF",
+        text: isSelected ? "#000000" : "#FFFFFF",
         size: isSelected ? 38 : 32,
         icon: undefined,
         iconSize: 0,
@@ -428,9 +428,9 @@ export default function MapTabScreen() {
     }
     // pending
     return {
-      bg: isSelected ? "#5EC299" : "#3498db", // Mint if selected, Blue if pending (OptimoRoute style)
+      bg: isSelected ? "#30D158" : "#FF9F0A", // iOS Green if selected, iOS Orange/Amber if pending
       border: "#FFFFFF",
-      text: isSelected ? "#0B291B" : "#000000", // Black/dark text
+      text: isSelected ? "#000000" : "#FFFFFF",
       size: isSelected ? 38 : 32,
       icon: undefined,
       iconSize: 0,
@@ -453,18 +453,18 @@ export default function MapTabScreen() {
             width: 56,
             height: 56,
             borderRadius: 16,
-            backgroundColor: "rgba(94,194,153,0.08)",
+            backgroundColor: "rgba(48,209,88,0.08)",
             alignItems: "center",
             justifyContent: "center",
             marginBottom: 16,
           }}
         >
-          <Ionicons name="map" size={24} color="#5EC299" />
+          <Ionicons name="map" size={24} color="#30D158" />
         </View>
-        <ActivityIndicator color="#5EC299" size="small" />
+        <ActivityIndicator color="#30D158" size="small" />
         <Text
           style={{
-            color: "rgba(229,236,233,0.35)",
+            color: "#8E8E93",
             fontSize: 13,
             marginTop: 12,
           }}
@@ -510,20 +510,20 @@ export default function MapTabScreen() {
 
     const statusConfig = {
       completed: {
-        color: "#5EC299",
-        bg: "rgba(94,194,153,0.1)",
+        color: "#30D158",
+        bg: "rgba(48,209,88,0.1)",
         label: "COMPLETED",
         icon: "checkmark-circle" as const,
       },
       failed: {
-        color: "#E05D61",
-        bg: "rgba(224,93,97,0.1)",
+        color: "#FF453A",
+        bg: "rgba(255,69,58,0.1)",
         label: "FAILED",
         icon: "close-circle" as const,
       },
       pending: {
-        color: "#5EC299",
-        bg: "rgba(94,194,153,0.1)",
+        color: "#FF9F0A",
+        bg: "rgba(255,159,10,0.1)",
         label: "PENDING",
         icon: "time" as const,
       },
@@ -544,12 +544,11 @@ export default function MapTabScreen() {
       <View style={{ width, paddingHorizontal: 16 }}>
         <View
           style={{
-            // backgroundColor: "#19201E",
-            backgroundColor: "#0B291B",
+            backgroundColor: "#1C1C1E",
             borderRadius: 20,
             overflow: "hidden",
             borderWidth: 1,
-            borderColor: "rgba(94,194,153,0.12)",
+            borderColor: "rgba(255,255,255,0.08)",
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0.45,
@@ -624,7 +623,7 @@ export default function MapTabScreen() {
                 <View style={{ flex: 1 }}>
                   <Text
                     style={{
-                      color: "#E5ECE9",
+                      color: "#FFFFFF",
                       fontSize: 15,
                       fontWeight: "700",
                     }}
@@ -644,11 +643,11 @@ export default function MapTabScreen() {
                       <Ionicons
                         name="time-outline"
                         size={10}
-                        color="white"
+                        color="#8E8E93"
                       />
                       <Text
                         style={{
-                          color: "white",
+                          color: "#8E8E93",
                           fontSize: 11,
                         }}
                       >
@@ -701,12 +700,12 @@ export default function MapTabScreen() {
               <Ionicons
                 name="location"
                 size={14}
-                color="white"
+                color="#8E8E93"
                 style={{ marginTop: 1 }}
               />
               <Text
                 style={{
-                  color: "white",
+                  color: "#FFFFFF",
                   fontSize: 12.5,
                   lineHeight: 18,
                   flex: 1,
@@ -741,11 +740,11 @@ export default function MapTabScreen() {
                   <Ionicons
                     name="flag"
                     size={10}
-                    color="rgba(110,180,110,0.6)"
+                    color="rgba(48,209,88,0.6)"
                   />
                   <Text
                     style={{
-                      color: "rgba(245,242,235,0.5)",
+                      color: "#8E8E93",
                       fontSize: 10,
                       fontWeight: "600",
                     }}
@@ -769,11 +768,11 @@ export default function MapTabScreen() {
                   <Ionicons
                     name="person"
                     size={10}
-                    color="rgba(110,180,110,0.6)"
+                    color="rgba(48,209,88,0.6)"
                   />
                   <Text
                     style={{
-                      color: "rgba(245,242,235,0.5)",
+                      color: "#8E8E93",
                       fontSize: 10,
                       fontWeight: "600",
                     }}
@@ -798,17 +797,17 @@ export default function MapTabScreen() {
                     alignItems: "center",
                     justifyContent: "center",
                     gap: 6,
-                    backgroundColor: "#5EC299",
+                    backgroundColor: "#30D158",
                     borderRadius: 12,
                     paddingVertical: 11,
                     paddingHorizontal: 16,
                   }}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="navigate" size={14} color="#0B291B" />
+                  <Ionicons name="navigate" size={14} color="#000000" />
                   <Text
                     style={{
-                      color: "#0B291B",
+                      color: "#000000",
                       fontSize: 13,
                       fontWeight: "700",
                     }}
@@ -839,11 +838,11 @@ export default function MapTabScreen() {
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 5,
-                  backgroundColor: "rgba(94,194,153,0.08)",
+                  backgroundColor: "rgba(48,209,88,0.08)",
                   borderRadius: 12,
                   paddingVertical: 11,
                   borderWidth: 1,
-                  borderColor: "rgba(94,194,153,0.15)",
+                  borderColor: "rgba(48,209,88,0.15)",
                 }}
                 activeOpacity={0.7}
               >
@@ -854,7 +853,7 @@ export default function MapTabScreen() {
                       : "document-text-outline"
                   }
                   size={14}
-                  color="#5EC299"
+                  color="#30D158"
                 />
                 <Text
                   style={{ color: "white", fontSize: 13, fontWeight: "600" }}
@@ -878,7 +877,7 @@ export default function MapTabScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <Ionicons name="chevron-back" size={16} color="#F5F2EB" />
+                <Ionicons name="chevron-back" size={16} color="#8E8E93" />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleNext}
@@ -894,7 +893,7 @@ export default function MapTabScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <Ionicons name="chevron-forward" size={16} color="#F5F2EB" />
+                <Ionicons name="chevron-forward" size={16} color="#8E8E93" />
               </TouchableOpacity>
             </View>
           </View>
@@ -925,12 +924,12 @@ export default function MapTabScreen() {
           <>
             <Polyline
               coordinates={polylineCoords}
-              strokeColor="rgba(52,152,219,0.15)"
+              strokeColor="rgba(48,209,88,0.15)"
               strokeWidth={10}
             />
             <Polyline
               coordinates={polylineCoords}
-              strokeColor="#3498db"
+              strokeColor="#30D158"
               strokeWidth={3.5}
               lineDashPattern={Platform.OS === "android" ? [12, 6] : undefined}
             />
@@ -992,7 +991,7 @@ export default function MapTabScreen() {
             top: insets.top + 8,
             left: 16,
             right: 60,
-            backgroundColor: "rgba(0,0,0,0.75)",
+            backgroundColor: "rgba(28,28,30,0.85)",
             borderRadius: 14,
             paddingHorizontal: 14,
             paddingVertical: 10,
@@ -1000,7 +999,7 @@ export default function MapTabScreen() {
             alignItems: "center",
             justifyContent: "space-between",
             borderWidth: 1,
-            borderColor: "rgba(94,194,153,0.15)",
+            borderColor: "rgba(255,255,255,0.08)",
           }}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -1009,20 +1008,20 @@ export default function MapTabScreen() {
                 width: 28,
                 height: 28,
                 borderRadius: 14,
-                backgroundColor: "rgba(94,194,153,0.15)",
+                backgroundColor: "rgba(48,209,88,0.15)",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <Ionicons name="navigate" size={14} color="#5EC299" />
+              <Ionicons name="navigate" size={14} color="#30D158" />
             </View>
             <View>
               <Text
-                style={{ color: "#E5ECE9", fontSize: 13, fontWeight: "700" }}
+                style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "700" }}
               >
                 Active Route
               </Text>
-              <Text style={{ color: "rgba(229,236,233,0.45)", fontSize: 10 }}>
+              <Text style={{ color: "#8E8E93", fontSize: 10 }}>
                 {completedCount}/{jobStops.length} stops completed
               </Text>
             </View>
@@ -1044,7 +1043,7 @@ export default function MapTabScreen() {
                     : 0,
                 height: 4,
                 borderRadius: 2,
-                backgroundColor: "#5EC299",
+                backgroundColor: "#30D158",
               }}
             />
           </View>
@@ -1076,15 +1075,15 @@ export default function MapTabScreen() {
               width: 40,
               height: 40,
               borderRadius: 12,
-              backgroundColor: "rgba(0,0,0,0.75)",
+              backgroundColor: "rgba(28,28,30,0.85)",
               alignItems: "center",
               justifyContent: "center",
               borderWidth: 1,
-              borderColor: "rgba(94,194,153,0.2)",
+              borderColor: "rgba(255,255,255,0.08)",
             }}
             activeOpacity={0.7}
           >
-            <Ionicons name="scan-outline" size={18} color="#5EC299" />
+            <Ionicons name="scan-outline" size={18} color="#30D158" />
           </TouchableOpacity>
         </View>
       )}
@@ -1131,12 +1130,12 @@ export default function MapTabScreen() {
                 const isActive = i === selectedStopIndex;
                 const stopStatus = getStopStatus(stops[i]);
                 const dotColor = isActive
-                  ? "#5EC299"
+                  ? "#30D158"
                   : stopStatus === "completed"
-                    ? "#5EC299"
+                    ? "#30D158"
                     : stopStatus === "failed"
-                      ? "#E05D61"
-                      : "rgba(229,236,233,0.15)";
+                      ? "#FF453A"
+                      : "rgba(255,255,255,0.15)";
                 return (
                   <TouchableOpacity
                     key={i}
@@ -1165,12 +1164,12 @@ export default function MapTabScreen() {
             bottom: 20,
             left: 16,
             right: 16,
-            backgroundColor: "#19201E",
+            backgroundColor: "#1C1C1E",
             borderRadius: 20,
             padding: 28,
             alignItems: "center",
             borderWidth: 1,
-            borderColor: "rgba(94,194,153,0.12)",
+            borderColor: "rgba(255,255,255,0.08)",
           }}
         >
           <View
@@ -1178,17 +1177,17 @@ export default function MapTabScreen() {
               width: 52,
               height: 52,
               borderRadius: 16,
-              backgroundColor: "rgba(94,194,153,0.08)",
+              backgroundColor: "rgba(48,209,88,0.08)",
               alignItems: "center",
               justifyContent: "center",
               marginBottom: 12,
             }}
           >
-            <Ionicons name="map-outline" size={24} color="#5EC299" />
+            <Ionicons name="map-outline" size={24} color="#30D158" />
           </View>
           <Text
             style={{
-              color: "#E5ECE9",
+              color: "#FFFFFF",
               fontSize: 16,
               fontWeight: "700",
               marginBottom: 4,
@@ -1198,7 +1197,7 @@ export default function MapTabScreen() {
           </Text>
           <Text
             style={{
-              color: "rgba(229,236,233,0.4)",
+              color: "#8E8E93",
               fontSize: 12,
               textAlign: "center",
               lineHeight: 18,

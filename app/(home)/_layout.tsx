@@ -5,6 +5,7 @@ export default function HomeLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="stop-detail" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="route-detail" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }

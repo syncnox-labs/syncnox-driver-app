@@ -50,18 +50,18 @@ function SettingRow({
   const content = (
     <View
       className="flex-row items-center justify-between py-4 px-5 border-b border-white/[0.05]"
-      style={{ backgroundColor: "#19201E" }}
+      style={{ backgroundColor: "#1C1C1E" }}
     >
       <View className="flex-row items-center gap-3.5">
         <Ionicons
           name={icon}
           size={18}
-          color={isDestructive ? "#E05D61" : "#5EC299"}
+          color={isDestructive ? "#FF453A" : "#30D158"}
         />
         <Text
           className="text-[15px] font-medium"
           style={{
-            color: isDestructive ? "#E05D61" : "#E5ECE9",
+            color: isDestructive ? "#FF453A" : "#FFFFFF",
           }}
         >
           {label}
@@ -74,7 +74,7 @@ function SettingRow({
         )}
         {rightElement}
         {onPress && !rightElement && (
-          <Ionicons name="chevron-forward" size={16} color="#5EC299" />
+          <Ionicons name="chevron-forward" size={16} color="#30D158" />
         )}
       </View>
     </View>
@@ -177,9 +177,9 @@ export default function SettingsTabScreen() {
                 disabled={true}
                 value={workingNow}
                 onValueChange={setWorkingNow}
-                trackColor={{ false: "#131917", true: "#0B291B" }}
-                thumbColor={workingNow ? "#5EC299" : "#8E9491"}
-                ios_backgroundColor="#131917"
+                trackColor={{ false: "#2C2C2E", true: "rgba(48,209,88,0.3)" }}
+                thumbColor={workingNow ? "#30D158" : "#8E8E93"}
+                ios_backgroundColor="#2C2C2E"
               />
             }
           />
@@ -193,9 +193,9 @@ export default function SettingsTabScreen() {
               <Switch
                 value={useCircleMarkers}
                 onValueChange={setUseCircleMarkers}
-                trackColor={{ false: "#1a1a1a", true: "rgba(94,194,153,0.3)" }}
-                thumbColor={useCircleMarkers ? "#5EC299" : "#9ca3af"}
-                ios_backgroundColor="#1a1a1a"
+                trackColor={{ false: "#1c1c1e", true: "rgba(48,209,88,0.3)" }}
+                thumbColor={useCircleMarkers ? "#30D158" : "#9ca3af"}
+                ios_backgroundColor="#1c1c1e"
               />
             }
           /> */}
