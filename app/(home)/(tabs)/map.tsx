@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import Svg, { Path, Circle, Text as SvgText, G } from "react-native-svg";
 import {
   View,
@@ -219,6 +219,37 @@ const PureMarkerPin = React.memo(
   },
 );
 PureMarkerPin.displayName = "PureMarkerPin";
+
+function decodePolyline(encoded: string): { latitude: number; longitude: number }[] {
+  const points: { latitude: number; longitude: number }[] = [];
+  let index = 0, len = encoded.length;
+  let lat = 0, lng = 0;
+
+  while (index < len) {
+    let b, shift = 0, result = 0;
+    do {
+      b = encoded.charAt(index++).charCodeAt(0) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charAt(index++).charCodeAt(0) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lng += dlng;
+
+    points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
+  }
+  return points;
+}
+
 // Default coordinates (Ahmedabad/Nadiad region)
 const DEFAULT_LATITUDE = 22.8219;
 const DEFAULT_LONGITUDE = 72.8282;
@@ -263,6 +294,21 @@ export default function MapTabScreen() {
       lat !== undefined && lat !== null && lng !== undefined && lng !== null
     );
   });
+
+  const polylineCoords = useMemo(() => {
+    if (assignedRoute?.route_polyline) {
+      try {
+        return decodePolyline(assignedRoute.route_polyline);
+      } catch (e) {
+        console.warn("Failed to decode route_polyline", e);
+      }
+    }
+    return stopsWithCoords.map((stop) => {
+      const lat = stop.location?.lat || stop.job!.location!.lat;
+      const lng = stop.location?.lng || stop.job!.location!.lng;
+      return { latitude: lat, longitude: lng };
+    });
+  }, [assignedRoute?.route_polyline, stopsWithCoords]);
 
   // Auto-fit map coordinates on load or route update, and focus on the current pending stop
   useEffect(() => {
@@ -474,12 +520,6 @@ export default function MapTabScreen() {
       </View>
     );
   }
-
-  const polylineCoords = stopsWithCoords.map((stop) => {
-    const lat = stop.location?.lat || stop.job!.location!.lat;
-    const lng = stop.location?.lng || stop.job!.location!.lng;
-    return { latitude: lat, longitude: lng };
-  });
 
   // Open native maps for navigation
   const openNavigation = (stop: RouteStop) => {

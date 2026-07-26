@@ -32,5 +32,6 @@ export interface AssignedRoute {
   total_distance_meters?: number;
   total_duration_seconds?: number;
   assignment_status: string; // "pending" | "acknowledged" | "in_progress"
+  route_polyline?: string;
   stops: RouteStop[];
 }
