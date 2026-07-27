@@ -96,7 +96,7 @@ function SettingRow({
 // ------------------------------------------------------------------ //
 
 export default function SettingsTabScreen() {
-  const { logout } = useAuthStore();
+  const { logout, driverName, driverId } = useAuthStore();
   const [workingNow, setWorkingNow] = useState(true);
   const [useCircleMarkers, setUseCircleMarkers] = useState(false);
 
@@ -167,6 +167,66 @@ export default function SettingsTabScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 40 }}
         >
+          {/* Driver Profile Card */}
+          <View
+            className="mx-5 mt-4 p-5 rounded-2xl flex-row items-center gap-4 border"
+            style={{
+              backgroundColor: "#1C1C1E",
+              borderColor: "rgba(48, 209, 88, 0.15)",
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
+          >
+            {/* Avatar / Initials */}
+            <View
+              className="w-14 h-14 rounded-full items-center justify-center border-2"
+              style={{
+                backgroundColor: "rgba(48, 209, 88, 0.08)",
+                borderColor: "rgba(48, 209, 88, 0.4)",
+              }}
+            >
+              <Text className="text-xl font-bold tracking-wider" style={{ color: "#30D158" }}>
+                {driverName ? driverName.split(' ').map(n => n[0]).join('').toUpperCase() : "D"}
+              </Text>
+            </View>
+
+            {/* Driver Details */}
+            <View className="flex-1 justify-center">
+              <Text className="text-white text-base font-bold tracking-tight">
+                {driverName || "Driver"}
+              </Text>
+              
+              <View className="flex-row items-center gap-2 mt-1.5">
+                {/* On Duty Pill */}
+                <View
+                  className="px-2 py-0.5 rounded-full flex-row items-center gap-1"
+                  style={{ backgroundColor: "rgba(48, 209, 88, 0.12)" }}
+                >
+                  <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#30D158" }} />
+                  <Text className="text-[10px] font-bold uppercase tracking-wider animate-pulse" style={{ color: "#30D158" }}>
+                    On Duty
+                  </Text>
+                </View>
+
+                {/* Driver ID badge */}
+                {driverId && (
+                  <Text
+                    className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-md"
+                    style={{
+                      color: "rgba(229, 236, 233, 0.5)",
+                      backgroundColor: "rgba(255, 255, 255, 0.05)",
+                    }}
+                  >
+                    ID: {String(driverId).padStart(4, '0')}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </View>
+
           {/* ON DUTY section */}
           <SectionHeader title="On Duty" />
           <SettingRow

@@ -277,30 +277,31 @@ function EmptyTab({ tab }: { tab: RouteTab }) {
 
 // ─── Main Routes Screen ───────────────────────────────────────────────────────
 export default function RoutesScreen() {
-  const { assignedRoute, isLoading, fetchMyRoute } = useRouteStore();
+  const { assignedRoute, allRoutes, isLoading, fetchMyRoutes } = useRouteStore();
   const [tab, setTab] = useState<RouteTab>('active');
 
   useRouteSocket();
 
   useEffect(() => {
-    fetchMyRoute();
+    fetchMyRoutes();
   }, []);
 
-  // Build route list: the real API returns a single assigned route
-  // We map it to the multi-route UI pattern from Figma
-  const allStops = assignedRoute?.stops ?? [];
-  const completedStops = allStops.filter(isStopDone);
-  const pendingStops = allStops.filter((s) => !isStopDone(s));
+  // Summary pills are based on the active route (non-completed)
+  const activeRoute = assignedRoute ?? null;
+  const allStops = activeRoute?.stops ?? [];
+  const allJobStops = allStops.filter((s) => !!s.job);
+  const completedStops = allJobStops.filter(isStopDone);
+  const pendingStops = allJobStops.filter((s) => !isStopDone(s));
 
   // Driver score (simple version based on completion)
-  const totalStops = allStops.filter((s) => !!s.job).length;
+  const totalStops = allJobStops.length;
   const completedCount = completedStops.filter((s) => getStopStatus(s) === 'completed').length;
   const driverScore = totalStops > 0 ? Math.round((completedCount / totalStops) * 100) : 0;
 
   // Distance and duration formatting
-  const distanceM = assignedRoute?.total_distance_meters ?? 0;
+  const distanceM = activeRoute?.total_distance_meters ?? 0;
   const distanceMi = distanceM > 0 ? `${(distanceM / 1609.34).toFixed(1)} mi` : '—';
-  const durSec = assignedRoute?.total_duration_seconds ?? 0;
+  const durSec = activeRoute?.total_duration_seconds ?? 0;
   const durH = Math.floor(durSec / 3600);
   const durMin = Math.floor((durSec % 3600) / 60);
   const durationLabel = durSec > 0 ? `${durH}h ${durMin}m` : '—';
@@ -309,10 +310,10 @@ export default function RoutesScreen() {
   const today = new Date();
   const dateLabel = today.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
-  // Filtered routes for each tab (since we have 1 route, show it in "active" only)
-  const activeRoutes = assignedRoute ? [assignedRoute] : [];
+  // Split routes from allRoutes into active vs done tabs
+  const activeRoutes = allRoutes.filter((r) => r.assignment_status !== 'completed');
   const upcomingRoutes: any[] = []; // real API doesn't return these yet
-  const doneRoutes: any[] = [];
+  const doneRoutes = allRoutes.filter((r) => r.assignment_status === 'completed');
 
   const tabRoutes: Record<RouteTab, any[]> = {
     active: activeRoutes,
@@ -427,7 +428,7 @@ export default function RoutesScreen() {
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={isLoading} onRefresh={fetchMyRoute} tintColor={G} colors={[G]} />
+              <RefreshControl refreshing={isLoading} onRefresh={fetchMyRoutes} tintColor={G} colors={[G]} />
             }
           >
             {displayed.length === 0 ? (

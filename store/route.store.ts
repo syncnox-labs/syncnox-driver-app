@@ -3,11 +3,13 @@ import { apiClient } from '@/config/apiClient';
 import { AssignedRoute, RouteStop } from '@/types/route.types';
 
 interface RouteState {
-  assignedRoute: AssignedRoute | null;
+  assignedRoute: AssignedRoute | null;  // active route for the map tab
+  allRoutes: AssignedRoute[];           // all routes (active + completed) for home tab
   isLoading: boolean;
   error: string | null;
 
   fetchMyRoute: () => Promise<void>;
+  fetchMyRoutes: () => Promise<void>;
   acknowledgeRoute: () => Promise<void>;
   updateStopStatus: (stopId: number, status: 'completed' | 'failed') => Promise<void>;
   clearRoute: () => void;
@@ -15,6 +17,7 @@ interface RouteState {
 
 export const useRouteStore = create<RouteState>((set, get) => ({
   assignedRoute: null,
+  allRoutes: [],
   isLoading: false,
   error: null,
 
@@ -41,6 +44,40 @@ export const useRouteStore = create<RouteState>((set, get) => ({
         assignedRoute: null,
         isLoading: false,
         error: is404 ? null : 'Failed to load route',
+      });
+    }
+  },
+
+  fetchMyRoutes: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await apiClient.get<{ routes: AssignedRoute[] }>('/driver/my-routes');
+      const routes = response.data.routes ?? [];
+
+      // Auto-acknowledge the most-recent pending route
+      const pendingRoute = routes.find((r) => r.assignment_status === 'pending');
+      if (pendingRoute) {
+        try {
+          await apiClient.post('/driver/my-route/acknowledge');
+          pendingRoute.assignment_status = 'acknowledged';
+        } catch (_) {
+          // non-fatal
+        }
+      }
+
+      // The "active" route is the first non-completed one
+      const active = routes.find(
+        (r) => r.assignment_status !== 'completed',
+      ) ?? null;
+
+      set({ allRoutes: routes, assignedRoute: active, isLoading: false });
+    } catch (e: any) {
+      const is404 = e?.response?.status === 404;
+      set({
+        allRoutes: [],
+        assignedRoute: null,
+        isLoading: false,
+        error: is404 ? null : 'Failed to load routes',
       });
     }
   },
@@ -75,12 +112,19 @@ export const useRouteStore = create<RouteState>((set, get) => ({
         };
       });
 
-      set({ assignedRoute: { ...current, stops: updatedStops } });
+      const updatedRoute = { ...current, stops: updatedStops };
+      set({ assignedRoute: updatedRoute });
+
+      // Also sync the updated route into allRoutes
+      const allRoutes = get().allRoutes.map((r) =>
+        r.route_id === updatedRoute.route_id ? updatedRoute : r,
+      );
+      set({ allRoutes });
     } catch (e: any) {
       console.error('updateStopStatus error:', e);
       throw e;
     }
   },
 
-  clearRoute: () => set({ assignedRoute: null, error: null }),
+  clearRoute: () => set({ assignedRoute: null, allRoutes: [], error: null }),
 }));

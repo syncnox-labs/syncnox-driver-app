@@ -27,13 +27,13 @@ function getWsBase(): string {
  * Hook that opens and maintains a WebSocket connection to the backend
  * driver channel: ws://host/ws/driver/{driverId}?code={activationCode}
  *
- * On receiving a 'route_assigned' event, triggers fetchMyRoute() from the
- * route store so the UI updates in real time.
+ * On receiving a 'route_assigned' event, triggers fetchMyRoutes() from the
+ * route store so the UI updates in real time (all tabs stay in sync).
  *
  * Auto-reconnects with exponential backoff (1 → 2 → 4 → 8 → 16 → 30 s).
  */
 export function useRouteSocket() {
-  const fetchMyRoute = useRouteStore((s) => s.fetchMyRoute);
+  const fetchMyRoutes = useRouteStore((s) => s.fetchMyRoutes);
   const activationCode = useAuthStore((s) => s.activationCode);
   const driverId = useAuthStore((s) => s.driverId);
   const wsRef = useRef<WebSocket | null>(null);
@@ -70,16 +70,16 @@ export function useRouteSocket() {
         ws.onopen = () => {
           console.log('[WS] Driver channel connected ✓');
           reconnectDelay.current = 1000; // reset backoff on successful connect
-          // Fetch route immediately in case we missed a push event
-          fetchMyRoute();
+          // Fetch all routes immediately in case we missed a push event
+          fetchMyRoutes();
         };
 
         ws.onmessage = (event) => {
           try {
             const payload = JSON.parse(event.data);
             if (payload.event === 'route_assigned') {
-              console.log('[WS] route_assigned received — fetching route');
-              fetchMyRoute();
+              console.log('[WS] route_assigned received — fetching all routes');
+              fetchMyRoutes();
             }
           } catch (_) {}
         };
@@ -111,5 +111,5 @@ export function useRouteSocket() {
       clearTimeout(reconnectTimer);
       wsRef.current?.close();
     };
-  }, [activationCode, driverId]);
+  }, [activationCode, driverId, fetchMyRoutes]);
 }
