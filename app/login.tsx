@@ -8,10 +8,10 @@ import {
   Platform,
   StatusBar,
   ScrollView,
+  Image,
 } from "react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Path, Circle } from "react-native-svg";
 import { useAuthStore } from "@/store/auth.store";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
@@ -25,23 +25,19 @@ function LogoMark() {
         width: 64,
         height: 64,
         borderRadius: 18,
-        backgroundColor: G,
+        backgroundColor: 'rgba(48,209,88,0.12)',
+        borderColor: 'rgba(48,209,88,0.25)',
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 24,
       }}
     >
-      <Svg width={32} height={32} viewBox="0 0 32 32" fill="none">
-        <Path
-          d="M6 22L16 8L26 22"
-          stroke="#000"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <Circle cx="16" cy="8" r="2" fill="#000" />
-        <Path d="M10 22H22" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
-      </Svg>
+      <Image
+        source={require('@/assets/images/logo-syncnox.png')}
+        style={{ width: 40, height: 40 }}
+        resizeMode="contain"
+      />
     </View>
   );
 }
