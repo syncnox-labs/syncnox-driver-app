@@ -38,20 +38,20 @@ export default function PrimaryButton({
           justifyContent: 'center',
         },
         variant === 'outline' && {
-          borderColor: '#5EC299',
+          borderColor: '#30D158',
           borderWidth: 1.5,
         },
         style,
       ]}
       contentStyle={{ height: 56 }}
       labelStyle={{
-        fontSize: 16,
-        fontWeight: '600',
-        letterSpacing: 0.3,
-        color: variant === 'filled' ? '#0B291B' : '#E5ECE9',
+        fontSize: 17,
+        fontWeight: '700',
+        letterSpacing: -0.2,
+        color: variant === 'filled' ? '#000000' : '#30D158',
       }}
-      buttonColor={variant === 'filled' ? '#5EC299' : 'transparent'}
-      rippleColor="rgba(94,194,153,0.25)"
+      buttonColor={variant === 'filled' ? '#30D158' : 'transparent'}
+      rippleColor="rgba(48,209,88,0.25)"
     >
       {label}
     </PaperButton>

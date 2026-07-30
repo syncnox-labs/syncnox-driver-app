@@ -2,14 +2,13 @@ import React, { useEffect, useRef } from "react";
 import { View, Text, Animated, StatusBar } from "react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import GradientBackground from "@/components/ui/GradientBackground";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import SyncnoxMark from "@/components/SyncnoxMark";
 
 /**
  * Welcome Screen
  * Staggered entrance animations: logo → content → CTA button.
- * Authenticated users are pre-redirected by the root _layout before reaching here.
+ * Centered layout with dark theme (#000000) and brand green accents (#30D158).
  */
 export default function WelcomeScreen() {
   const logoAnim = useRef(new Animated.ValueXY({ x: 0, y: -20 })).current;
@@ -61,90 +60,104 @@ export default function WelcomeScreen() {
   }, []);
 
   return (
-    <GradientBackground>
+    <View style={{ flex: 1, backgroundColor: "#000000" }}>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
         translucent
       />
-      <SafeAreaView className="flex-1 flex-col justify-around px-7 pt-4" edges={["top", "bottom"]}>
-        {/* Hero — logo centred in a decorative ring */}
-        <View className="flex-[0.55] items-center justify-center">
+      <SafeAreaView
+        style={{ flex: 1 }}
+        className="flex-1 justify-between items-center px-6 pt-6 pb-6"
+        edges={["top", "bottom"]}
+      >
+        {/* Main Content Area — Centered Vertically and Horizontally */}
+        <View className="flex-1 justify-center items-center w-full max-w-md">
+          {/* Animated Logo Container */}
           <Animated.View
             style={{
               opacity: logoOpacity,
               transform: [{ translateY: logoAnim.y }],
             }}
-            className="items-center"
+            className="items-center mb-6"
           >
             <View
-              className="w-40 h-40 rounded-full items-center justify-center border border-brand-green/15"
-              style={{ backgroundColor: "rgba(48,209,88,0.08)" }}
+              style={{
+                width: 84,
+                height: 84,
+                borderRadius: 26,
+                // backgroundColor: "rgba(48,209,88,0.12)",
+                // borderColor: "rgba(48,209,88,0.25)",
+                borderWidth: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                // shadowColor: "#30D158",
+                // shadowOffset: { width: 0, height: 6 },
+                // shadowOpacity: 0.25,
+                // shadowRadius: 16,
+                // elevation: 6,
+              }}
             >
-              <View
-                className="w-28 h-28 rounded-full items-center justify-center border border-brand-green/25"
-                style={{ backgroundColor: "rgba(48,209,88,0.12)" }}
-              >
-                <SyncnoxMark size={72} />
-              </View>
+              <SyncnoxMark size={64} />
             </View>
           </Animated.View>
 
-          {/* Decorative dot grid */}
-          {/* <View className="absolute bottom-5 right-0 flex-row flex-wrap w-[75px] gap-2">
-            {Array.from({ length: 15 }).map((_, i) => (
-              <View
-                key={i}
-                className="w-1 h-1 rounded-full bg-brand-green/25"
-              />
-            ))}
-          </View> */}
+          {/* Main Text Content */}
+          <Animated.View
+            style={{
+              opacity: contentOpacity,
+              transform: [{ translateY: contentY }],
+            }}
+            className="w-full items-center"
+          >
+            <Text className="text-white text-3xl font-bold tracking-tight text-center mb-3">
+              Syncnox Driver
+            </Text>
+            <Text
+              className="text-[#8E8E93] text-base leading-6 text-center mb-6 px-2"
+              style={{ fontWeight: "400" }}
+            >
+              Smart delivery management for drivers. Receive routes from your dispatcher, navigate efficiently, and track every stop in real time.
+            </Text>
+
+            {/* Feature Pills (Centered) */}
+            <View className="flex-row flex-wrap justify-center gap-2.5">
+              {["📍 Live Dispatch", "✅ Stop Tracking"].map(
+                (label) => (
+                  <View
+                    key={label}
+                    style={{
+                      backgroundColor: "#1C1C1E",
+                      borderColor: "rgba(48,209,88,0.25)",
+                      borderWidth: 1,
+                      borderRadius: 999,
+                      paddingHorizontal: 14,
+                      paddingVertical: 7,
+                    }}
+                  >
+                    <Text style={{ color: "#30D158", fontSize: 13, fontWeight: "600" }}>
+                      {label}
+                    </Text>
+                  </View>
+                ),
+              )}
+            </View>
+          </Animated.View>
         </View>
 
-        {/* Text content */}
+        {/* Bottom CTA Action Area */}
         <Animated.View
           style={{
-            opacity: contentOpacity,
-            transform: [{ translateY: contentY }],
+            opacity: btnOpacity,
+            transform: [{ translateY: btnY }],
           }}
-          className="pb-8"
-        >
-          <Text className="text-text-primary text-4xl font-extrabold tracking-tight mb-3">
-            Syncnox Driver
-          </Text>
-          <Text className="text-text-secondary text-[15px] leading-6 mb-6">
-            Smart delivery management for drivers.{"\n"}
-            Receive routes from your dispatcher and{"\n"}
-            track every stop seamlessly.
-          </Text>
-
-          {/* Feature pills */}
-          <View className="flex-row flex-wrap gap-2">
-            {["📍 Live Routes", "✅ Stop Tracking", "🔒 Secure"].map(
-              (label) => (
-                <View
-                   key={label}
-                   className="border border-brand-green/25 rounded-full px-3 py-1"
-                   style={{ backgroundColor: "rgba(48,209,88,0.12)" }}
-                >
-                  <Text className="text-primary-light text-xs font-medium">
-                    {label}
-                  </Text>
-                </View>
-              ),
-            )}
-          </View>
-        </Animated.View>
-
-        {/* CTA */}
-        <Animated.View
-          style={{ opacity: btnOpacity, transform: [{ translateY: btnY }] }}
-          className="pb-3 gap-4"
+          className="w-full pb-2 gap-3 items-center"
         >
           <PrimaryButton
             label="I have an activation key"
             onPress={() => router.push("/login")}
             style={{
+              width: "100%",
               shadowColor: "#30D158",
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.4,
@@ -152,8 +165,12 @@ export default function WelcomeScreen() {
               elevation: 8,
             }}
           />
+
+          <Text style={{ fontSize: 13, color: "#8E8E93", textAlign: "center" }}>
+            Key provided by your fleet dispatcher
+          </Text>
         </Animated.View>
       </SafeAreaView>
-    </GradientBackground>
+    </View>
   );
 }

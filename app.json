@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "syncnox-driver-app",
+    "name": "Syncnox",
     "slug": "syncnox-driver-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo-syncnox.png",
+    "icon": "./assets/images/syncnox-icon-padded.png",
     "scheme": "syncnoxdriverapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -17,17 +17,17 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/logo-syncnox.png",
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/images/syncnox-android-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/logo-syncnox.png"
+        "monochromeImage": "./assets/images/syncnox-android-foreground.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.mohsinali530121.syncnoxdriverapp",
       "config": {
         "googleMaps": {
-          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+          "apiKey": "AIzaSyAUOmd-oe3hRx0ZmxQhfOD8ufgGIHRt8Ag"
         }
       }
     },
