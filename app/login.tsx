@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
@@ -36,11 +37,112 @@ function LogoMark() {
   );
 }
 
+// ─── Underline 12-Digit Activation Key Input ──────────────────────────────────
+function UnderlineKeyInput({
+  setCode,
+  setError,
+  onSubmit,
+}: {
+  setCode: (c: string) => void;
+  setError: (e: string) => void;
+  onSubmit: () => void;
+}) {
+  const [digits, setDigits] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+
+  const handleChange = (text: string) => {
+    const cleaned = text.replace(/\D/g, "").slice(0, 12);
+    setDigits(cleaned);
+    setError("");
+    setCode(cleaned);
+  };
+
+  const handlePress = () => {
+    if (inputRef.current) {
+      inputRef.current.blur();
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    }
+  };
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      className="items-center justify-center my-3 w-full"
+    >
+      {/* Hidden Native TextInput */}
+      <TextInput
+        ref={inputRef}
+        value={digits}
+        onChangeText={handleChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        onSubmitEditing={onSubmit}
+        keyboardType="number-pad"
+        maxLength={12}
+        caretHidden
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          opacity: 0.01,
+        }}
+      />
+
+      {/* Underline Groups Display (3 compact groups of 4 slots with dashes in between) */}
+      <View className="flex-row items-center justify-center gap-1.5 my-1">
+        {[0, 1, 2].map((groupIdx) => (
+          <React.Fragment key={groupIdx}>
+            {groupIdx > 0 && (
+              <Text className="text-white/40 text-base font-bold px-0.5">
+                {" "}
+              </Text>
+            )}
+            <View className="flex-row items-center gap-1">
+              {[0, 1, 2, 3].map((slotIdx) => {
+                const index = groupIdx * 4 + slotIdx;
+                const char = digits[index];
+                const isCurrent = isFocused && index === digits.length;
+                const isFilled = char !== undefined;
+
+                return (
+                  <View
+                    key={index}
+                    className={`w-[18px] h-8 items-center justify-center border-b-2 ${
+                      isCurrent
+                        ? "border-brand-green"
+                        : isFilled
+                        ? "border-white"
+                        : "border-white/25"
+                    }`}
+                  >
+                    <Text className="text-white text-base font-bold">
+                      {char || ""}
+                    </Text>
+                    {isCurrent && (
+                      <View className="absolute h-4 w-[2px] bg-brand-green rounded-full" />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </React.Fragment>
+        ))}
+      </View>
+
+      <Text className="text-text-secondary text-xs mt-3 font-normal text-center">
+        Enter your key here
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function LoginScreen() {
   const { login, setCode, code } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [focused, setFocused] = useState(false);
 
   const handleActivate = async () => {
     if (!code.trim()) {
@@ -91,50 +193,12 @@ export default function LoginScreen() {
                 >
                   Syncnox Driver
                 </Text>
-                <Text style={{ fontSize: 16, color: '#8E8E93', fontWeight: '400', lineHeight: 24, textAlign: 'center', paddingHorizontal: 8 }}>
-                  Enter the activation key provided by your fleet dispatcher.
-                </Text>
               </View>
 
               {/* Input & Activate Button Container */}
               <View style={{ width: '100%', maxWidth: 400 }}>
-                <View style={{ marginBottom: error ? 4 : 16 }}>
-                  <View
-                    style={{
-                      backgroundColor: '#1C1C1E',
-                      borderRadius: 14,
-                      borderWidth: 1.5,
-                      borderColor: focused ? G : 'transparent',
-                      height: 56,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingHorizontal: 16,
-                    }}
-                  >
-                    <TextInput
-                      value={code}
-                      onChangeText={(v) => { setCode(v); setError(''); }}
-                      onFocus={() => setFocused(true)}
-                      onBlur={() => setFocused(false)}
-                      onSubmitEditing={handleActivate}
-                      placeholder="e.g. DRV-2024-DEMO"
-                      placeholderTextColor="#3A3A3C"
-                      autoCapitalize="characters"
-                      autoCorrect={false}
-                      returnKeyType="done"
-                      style={{
-                        flex: 1,
-                        backgroundColor: 'transparent',
-                        fontSize: 17,
-                        fontWeight: '500',
-                        color: '#fff',
-                        fontFamily: 'monospace',
-                        letterSpacing: 1,
-                        textAlign: 'center',
-                      }}
-                    />
-                  </View>
-                </View>
+                {/* Underline 12-Digit Input with NativeWind Styling */}
+                <UnderlineKeyInput setCode={setCode} setError={setError} onSubmit={handleActivate} />
 
                 {/* Error */}
                 {!!error && (
