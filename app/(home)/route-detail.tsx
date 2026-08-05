@@ -178,10 +178,14 @@ function StopRow({
 // ─── Route Detail Screen ──────────────────────────────────────────────────────
 export default function RouteDetailScreen() {
   const { routeId } = useLocalSearchParams<{ routeId: string }>();
-  const { assignedRoute } = useRouteStore();
+  const { assignedRoute, allRoutes } = useRouteStore();
 
-  // For now we only have one route
-  const route = assignedRoute;
+  // Find target route matching routeId, fallback to assignedRoute or first available route
+  const route =
+    allRoutes.find((r) => String(r.route_id) === String(routeId)) ??
+    (assignedRoute && String(assignedRoute.route_id) === String(routeId)
+      ? assignedRoute
+      : assignedRoute ?? allRoutes[0]);
 
   if (!route) {
     return (
@@ -196,8 +200,10 @@ export default function RouteDetailScreen() {
   }
 
   const allStops = route.stops ?? [];
-  const completedStops = allStops.filter(isStopDone);
-  const totalStops = allStops.length;
+  const jobStops = allStops.filter((s) => !!s.job);
+  const effectiveStops = jobStops.length > 0 ? jobStops : allStops;
+  const completedStops = effectiveStops.filter(isStopDone);
+  const totalStops = effectiveStops.length;
   const pct = totalStops > 0 ? Math.round((completedStops.length / totalStops) * 100) : 0;
 
   // Find the next pending stop to navigate to

@@ -113,8 +113,11 @@ function RouteCard({
   onPress: () => void;
   onStart: () => void;
 }) {
-  const totalStops = route.stops?.length ?? 0;
-  const completedStops = route.stops?.filter((s: any) => isStopDone(s)).length ?? 0;
+  const allStops = route.stops ?? [];
+  const jobStops = allStops.filter((s: any) => !!s.job);
+  const effectiveStops = jobStops.length > 0 ? jobStops : allStops;
+  const totalStops = effectiveStops.length;
+  const completedStops = effectiveStops.filter((s: any) => isStopDone(s)).length;
   const pct = totalStops > 0 ? (completedStops / totalStops) * 100 : 0;
   const isActive = tab === 'active';
   const isUpcoming = tab === 'upcoming';

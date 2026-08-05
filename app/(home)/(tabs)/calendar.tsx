@@ -1,21 +1,23 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path, Rect, Circle } from 'react-native-svg';
+import { router } from 'expo-router';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { useRouteStore } from '@/store/route.store';
+import { isStopDone } from '../_components/homeScreen.utils';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const G = '#30D158';
 const CARD = '#1C1C1E';
 const LABEL = '#8E8E93';
 const SEP = 'rgba(255,255,255,0.08)';
-const BLUE = '#0A84FF';
 
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = [
@@ -34,15 +36,31 @@ function getWeekDates(anchor: Date): Date[] {
   });
 }
 
+function getMonthGrid(year: number, month: number): (Date | null)[] {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const grid: (Date | null)[] = [];
+  for (let i = 0; i < firstDay; i++) {
+    grid.push(null);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    grid.push(new Date(year, month, d));
+  }
+  return grid;
+}
+
 function isoOf(d: Date) {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function sameDay(a: Date, b: Date) {
   return isoOf(a) === isoOf(b);
 }
 
-// ─── Chevron Icons ────────────────────────────────────────────────────────────
+// ─── Icons ────────────────────────────────────────────────────────────────────
 function ChevLeft() {
   return (
     <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
@@ -50,6 +68,7 @@ function ChevLeft() {
     </Svg>
   );
 }
+
 function ChevRight() {
   return (
     <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
@@ -58,12 +77,47 @@ function ChevRight() {
   );
 }
 
+function CalendarIcon() {
+  return (
+    <Svg width={15} height={15} viewBox="0 0 16 16" fill="none">
+      <Rect x="2" y="3" width="12" height="11" rx="2" stroke={G} strokeWidth="1.4" />
+      <Path d="M2 6.5h12" stroke={G} strokeWidth="1" />
+      <Path d="M5 1.5v3M11 1.5v3" stroke={G} strokeWidth="1.4" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
+      <Path d="M2.5 4.5L6 8l3.5-3.5" stroke={LABEL} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <Svg width={14} height={14} viewBox="0 0 14 14" fill="none">
+      <Path d="M1 1l12 12M13 1L1 13" stroke={LABEL} strokeWidth="2" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 // ─── Calendar Screen ──────────────────────────────────────────────────────────
 export default function CalendarScreen() {
-  const { assignedRoute } = useRouteStore();
+  const { assignedRoute, allRoutes, fetchMyRoutes } = useRouteStore();
   const today = new Date();
   const [selected, setSelected] = useState(today);
   const [weekAnchor, setWeekAnchor] = useState(today);
+
+  useEffect(() => {
+    fetchMyRoutes();
+  }, []);
+
+  // Date Picker Modal state
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerYear, setPickerYear] = useState(today.getFullYear());
+  const [pickerMonth, setPickerMonth] = useState(today.getMonth());
 
   const week = getWeekDates(weekAnchor);
   const monthLabel = `${MONTHS[week[0].getMonth()]} ${week[0].getFullYear()}`;
@@ -73,18 +127,62 @@ export default function CalendarScreen() {
     d.setDate(d.getDate() - 7);
     setWeekAnchor(d);
   };
+
   const nextWeek = () => {
     const d = new Date(weekAnchor);
     d.setDate(d.getDate() + 7);
     setWeekAnchor(d);
   };
 
-  // Map the assigned route to a date for the calendar dot
+  const openPicker = () => {
+    setPickerYear(selected.getFullYear());
+    setPickerMonth(selected.getMonth());
+    setPickerVisible(true);
+  };
+
+  const handleSelectDate = (d: Date) => {
+    setSelected(d);
+    setWeekAnchor(d);
+    setPickerVisible(false);
+  };
+
+  const handleJumpToToday = () => {
+    const now = new Date();
+    setSelected(now);
+    setWeekAnchor(now);
+    setPickerVisible(false);
+  };
+
+  // Map routes to dates for the calendar dot
   const routeDate = assignedRoute?.scheduled_date
     ? assignedRoute.scheduled_date.slice(0, 10)
     : isoOf(today);
 
-  const hasRouteOnDay = (d: Date) => isoOf(d) === routeDate;
+  const hasRouteOnDay = (d: Date) => {
+    const targetIso = isoOf(d);
+    if (allRoutes && allRoutes.length > 0) {
+      const foundInAll = allRoutes.some(
+        (r) => r.scheduled_date && r.scheduled_date.slice(0, 10) === targetIso
+      );
+      if (foundInAll) return true;
+    }
+    return targetIso === routeDate && !!assignedRoute;
+  };
+
+  const monthHasRoute = (mIdx: number) => {
+    if (allRoutes && allRoutes.length > 0) {
+      return allRoutes.some((r) => {
+        if (!r.scheduled_date) return false;
+        const dt = new Date(r.scheduled_date);
+        return dt.getFullYear() === pickerYear && dt.getMonth() === mIdx;
+      });
+    }
+    if (assignedRoute?.scheduled_date) {
+      const dt = new Date(assignedRoute.scheduled_date);
+      return dt.getFullYear() === pickerYear && dt.getMonth() === mIdx;
+    }
+    return false;
+  };
 
   // Stats for the week
   const weekHasRoute = week.some((d) => hasRouteOnDay(d));
@@ -93,8 +191,12 @@ export default function CalendarScreen() {
   const distanceMi = distanceM > 0 ? `${(distanceM / 1609.34).toFixed(1)} mi` : '0.0 mi';
 
   // Routes for the selected day
-  const selectedRoutes =
-    assignedRoute && isoOf(selected) === routeDate ? [assignedRoute] : [];
+  const selectedRoutes = (allRoutes ?? []).filter(
+    (r) => r.scheduled_date && r.scheduled_date.slice(0, 10) === isoOf(selected)
+  );
+  if (selectedRoutes.length === 0 && assignedRoute && isoOf(selected) === routeDate) {
+    selectedRoutes.push(assignedRoute);
+  }
 
   const durSec = assignedRoute?.total_duration_seconds ?? 0;
   const durH = Math.floor(durSec / 3600);
@@ -106,29 +208,67 @@ export default function CalendarScreen() {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* ── Header ── */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 4 }}>
-          <Text style={{ fontSize: 13, color: LABEL, marginBottom: 2 }}>Schedule</Text>
-          <Text style={{ fontSize: 34, fontWeight: '700', color: '#fff', letterSpacing: -1, lineHeight: 40, marginBottom: 16 }}>
-            Calendar
-          </Text>
+        <View style={{ paddingHorizontal: 20, paddingTop: 4, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 }}>
+          <View>
+            <Text style={{ fontSize: 13, color: LABEL, marginBottom: 2 }}>Schedule</Text>
+            <Text style={{ fontSize: 34, fontWeight: '700', color: '#fff', letterSpacing: -1, lineHeight: 40 }}>
+              Calendar
+            </Text>
+          </View>
+          {!sameDay(selected, today) && (
+            <TouchableOpacity
+              onPress={handleJumpToToday}
+              activeOpacity={0.75}
+              style={{
+                backgroundColor: 'rgba(48,209,88,0.15)',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: 'rgba(48,209,88,0.3)',
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '600', color: G }}>Jump to Today</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* ── Week navigator ── */}
+        {/* ── Week Navigator ── */}
         <View style={{ paddingHorizontal: 20, paddingBottom: 4 }}>
-          {/* Month + nav arrows */}
+          {/* Month + nav arrows + interactive picker button */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <TouchableOpacity
               onPress={prevWeek}
               activeOpacity={0.7}
-              style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center' }}
             >
               <ChevLeft />
             </TouchableOpacity>
-            <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff', letterSpacing: -0.3 }}>{monthLabel}</Text>
+
+            <TouchableOpacity
+              onPress={openPicker}
+              activeOpacity={0.75}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: '#1C1C1E',
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.08)',
+              }}
+            >
+              <CalendarIcon />
+              <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff', letterSpacing: -0.3 }}>{monthLabel}</Text>
+              <ChevronDownIcon />
+            </TouchableOpacity>
+
             <TouchableOpacity
               onPress={nextWeek}
               activeOpacity={0.7}
-              style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center' }}
             >
               <ChevRight />
             </TouchableOpacity>
@@ -203,7 +343,7 @@ export default function CalendarScreen() {
           <Text style={{ fontSize: 13, fontWeight: '600', color: sameDay(selected, today) ? G : '#fff' }}>
             {sameDay(selected, today)
               ? 'Today'
-              : selected.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+              : selected.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
             {'  '}
             <Text style={{ fontSize: 13, fontWeight: '400', color: LABEL }}>
               · {selectedRoutes.length} route{selectedRoutes.length !== 1 ? 's' : ''}
@@ -225,17 +365,24 @@ export default function CalendarScreen() {
           ) : (
             <View style={{ backgroundColor: CARD, borderRadius: 16, overflow: 'hidden' }}>
               {selectedRoutes.map((route, i) => {
-                const routeStops = route.stops?.length ?? 0;
-                const completedCount = route.stops?.filter((s: any) => {
-                  const status = s.job?.status;
-                  return status === 'completed' || status === 'failed';
-                }).length ?? 0;
+                const allStops = route.stops ?? [];
+                const jobStops = allStops.filter((s: any) => !!s.job);
+                const effectiveStops = jobStops.length > 0 ? jobStops : allStops;
+                const routeStops = effectiveStops.length;
+                const completedCount = effectiveStops.filter((s: any) => isStopDone(s)).length;
                 const pct = routeStops > 0 ? (completedCount / routeStops) * 100 : 0;
                 const routeName = route.name ?? `Route #${route.route_id}`;
 
                 return (
-                  <View
+                  <TouchableOpacity
                     key={i}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(home)/route-detail' as any,
+                        params: { routeId: route.route_id },
+                      })
+                    }
+                    activeOpacity={0.7}
                     style={{
                       padding: 14,
                       paddingHorizontal: 16,
@@ -267,12 +414,211 @@ export default function CalendarScreen() {
                         </View>
                       </View>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
           )}
         </ScrollView>
+
+        {/* ── Fast Date Picker Modal ── */}
+        <Modal
+          visible={pickerVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPickerVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setPickerVisible(false)}
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.75)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: 20,
+            }}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: 360,
+                backgroundColor: '#1C1C1E',
+                borderRadius: 24,
+                padding: 20,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.5,
+                shadowRadius: 20,
+                elevation: 10,
+              }}
+            >
+              {/* Modal Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff' }}>Select Date</Text>
+                <TouchableOpacity
+                  onPress={() => setPickerVisible(false)}
+                  style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: '#2C2C2E', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <CloseIcon />
+                </TouchableOpacity>
+              </View>
+
+              {/* Year Navigation */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2C2C2E', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 16 }}>
+                <TouchableOpacity
+                  onPress={() => setPickerYear((y) => y - 1)}
+                  style={{ padding: 6 }}
+                >
+                  <ChevLeft />
+                </TouchableOpacity>
+                <Text style={{ fontSize: 17, fontWeight: '700', color: G, letterSpacing: -0.3 }}>{pickerYear}</Text>
+                <TouchableOpacity
+                  onPress={() => setPickerYear((y) => y + 1)}
+                  style={{ padding: 6 }}
+                >
+                  <ChevRight />
+                </TouchableOpacity>
+              </View>
+
+              {/* Months Grid (12 Months) */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                {MONTHS.map((m, idx) => {
+                  const isCur = idx === pickerMonth;
+                  const hasMonthRoute = monthHasRoute(idx);
+                  return (
+                    <TouchableOpacity
+                      key={m}
+                      onPress={() => setPickerMonth(idx)}
+                      style={{
+                        width: '23%',
+                        paddingVertical: 6,
+                        borderRadius: 10,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isCur ? G : 'rgba(255,255,255,0.05)',
+                        position: 'relative',
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: isCur ? '#000' : '#fff' }}>
+                        {m.slice(0, 3)}
+                      </Text>
+                      {hasMonthRoute && (
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: 3,
+                            right: 4,
+                            width: 5,
+                            height: 5,
+                            borderRadius: 2.5,
+                            backgroundColor: isCur ? '#000' : G,
+                          }}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Days Header */}
+              <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+                {DAYS.map((d, idx) => (
+                  <Text key={idx} style={{ width: '14.28%', textAlign: 'center', fontSize: 11, fontWeight: '600', color: LABEL }}>
+                    {d}
+                  </Text>
+                ))}
+              </View>
+
+              {/* Month Grid */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                {getMonthGrid(pickerYear, pickerMonth).map((d, idx) => {
+                  if (!d) {
+                    return <View key={`empty-${idx}`} style={{ width: '14.28%', height: 44 }} />;
+                  }
+                  const isSel = sameDay(d, selected);
+                  const isTod = sameDay(d, today);
+                  const hasDot = hasRouteOnDay(d);
+                  return (
+                    <TouchableOpacity
+                      key={d.toISOString()}
+                      onPress={() => handleSelectDate(d)}
+                      style={{
+                        width: '14.28%',
+                        height: 44,
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                        paddingTop: 2,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: 15,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: isSel ? G : 'transparent',
+                          borderWidth: isTod && !isSel ? 1.5 : 0,
+                          borderColor: G,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: isSel || isTod ? '700' : '500',
+                            color: isSel ? '#000' : isTod ? G : '#fff',
+                          }}
+                        >
+                          {d.getDate()}
+                        </Text>
+                      </View>
+                      {/* Green dot indicator for route */}
+                      <View style={{ height: 4, alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
+                        {hasDot && (
+                          <View
+                            style={{
+                              width: 4,
+                              height: 4,
+                              borderRadius: 2,
+                              backgroundColor: isSel ? '#000' : G,
+                            }}
+                          />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Route Indicator Legend */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 }}>
+                <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: G }} />
+                <Text style={{ fontSize: 11, color: LABEL }}>Date with scheduled route</Text>
+              </View>
+
+              {/* Quick Actions */}
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: SEP }}>
+                <TouchableOpacity
+                  onPress={handleJumpToToday}
+                  style={{ flex: 1, height: 40, borderRadius: 12, backgroundColor: 'rgba(48,209,88,0.12)', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: G }}>Jump to Today</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setPickerVisible(false)}
+                  style={{ flex: 1, height: 40, borderRadius: 12, backgroundColor: '#2C2C2E', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
       </SafeAreaView>
     </View>
   );
