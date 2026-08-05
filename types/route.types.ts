@@ -28,6 +28,7 @@ export interface RouteStop {
 
 export interface AssignedRoute {
   route_id: number;
+  name?: string;
   scheduled_date?: string;
   total_distance_meters?: number;
   total_duration_seconds?: number;

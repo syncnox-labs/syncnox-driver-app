@@ -136,7 +136,6 @@ function RouteCard({
     : 'Today';
 
   const routeName = route.name ?? `Route #${route.route_id}`;
-  const routeId = `R-${route.route_id}`;
 
   const stopsLabel = isUpcoming
     ? `${totalStops}`
@@ -147,19 +146,16 @@ function RouteCard({
   return (
     <View style={{ backgroundColor: CARD, borderRadius: 16, marginBottom: 10, overflow: 'hidden' }}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={{ padding: 16, paddingBottom: 14 }}>
-        {/* Route ID + status */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ fontSize: 11, fontFamily: 'monospace', color: LABEL, letterSpacing: 1 }}>{routeId}</Text>
+        {/* Route Name + status */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, paddingRight: 8 }}>
+            <Text style={{ fontSize: 17, fontWeight: '600', color: '#fff', letterSpacing: -0.3, lineHeight: 22 }} numberOfLines={1}>
+              {routeName}
+            </Text>
             <StatusPill status={pillStatus} />
           </View>
           <ChevronRight />
         </View>
-
-        {/* Route name */}
-        <Text style={{ fontSize: 17, fontWeight: '600', color: '#fff', letterSpacing: -0.3, lineHeight: 22, marginBottom: 2 }}>
-          {routeName}
-        </Text>
 
         {/* Date + time */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>

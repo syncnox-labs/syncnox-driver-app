@@ -253,11 +253,8 @@ export default function RouteDetailScreen() {
               <BackArrow />
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11, fontFamily: 'monospace', color: LABEL, letterSpacing: 1 }}>
-                #{route.route_id}
-              </Text>
               <Text style={{ fontSize: 20, fontWeight: '700', color: '#fff', letterSpacing: -0.5, lineHeight: 26 }}>
-                {(route as any).name ?? `Route #${route.route_id}`}
+                {route.name ?? `Route #${route.route_id}`}
               </Text>
             </View>
             {isLive && (

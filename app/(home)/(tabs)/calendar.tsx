@@ -231,7 +231,7 @@ export default function CalendarScreen() {
                   return status === 'completed' || status === 'failed';
                 }).length ?? 0;
                 const pct = routeStops > 0 ? (completedCount / routeStops) * 100 : 0;
-                const routeName = (route as any).name ?? `Route #${route.route_id}`;
+                const routeName = route.name ?? `Route #${route.route_id}`;
 
                 return (
                   <View
