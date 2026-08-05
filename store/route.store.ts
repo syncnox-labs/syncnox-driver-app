@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import { apiClient } from '@/config/apiClient';
 import { AssignedRoute, RouteStop } from '@/types/route.types';
+import { DistanceUnit } from '@/utils/distance.utils';
 
 interface RouteState {
   assignedRoute: AssignedRoute | null;  // active route for the map tab
   allRoutes: AssignedRoute[];           // all routes (active + completed) for home tab
+  distanceUnit: DistanceUnit;           // 'miles' | 'km'
   isLoading: boolean;
   error: string | null;
 
@@ -12,12 +14,14 @@ interface RouteState {
   fetchMyRoutes: () => Promise<void>;
   acknowledgeRoute: () => Promise<void>;
   updateStopStatus: (stopId: number, status: 'completed' | 'failed') => Promise<void>;
+  setDistanceUnit: (unit: DistanceUnit) => Promise<void>;
   clearRoute: () => void;
 }
 
 export const useRouteStore = create<RouteState>((set, get) => ({
   assignedRoute: null,
   allRoutes: [],
+  distanceUnit: 'miles',
   isLoading: false,
   error: null,
 
@@ -51,8 +55,10 @@ export const useRouteStore = create<RouteState>((set, get) => ({
   fetchMyRoutes: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await apiClient.get<{ routes: AssignedRoute[] }>('/driver/my-routes');
+      const response = await apiClient.get<{ routes: AssignedRoute[]; distance_unit?: string }>('/driver/my-routes');
       const routes = response.data.routes ?? [];
+      const unitRaw = response.data.distance_unit;
+      const unit: DistanceUnit = unitRaw === 'km' || unitRaw === 'kilometers' ? 'km' : 'miles';
 
       // Sanitize routes: if all job stops are completed, mark assignment_status as 'completed'
       const sanitizedRoutes = routes.map((r) => {
@@ -71,12 +77,17 @@ export const useRouteStore = create<RouteState>((set, get) => ({
         return r;
       });
 
-      // The "active" route is the first non-completed one
-      const active = sanitizedRoutes.find(
+      // Active route selection priority: in_progress > acknowledged > first pending (FIFO)
+      const nonCompleted = sanitizedRoutes.filter(
         (r) => r.assignment_status !== 'completed',
-      ) ?? null;
+      );
+      const active =
+        nonCompleted.find((r) => r.assignment_status === 'in_progress') ??
+        nonCompleted.find((r) => r.assignment_status === 'acknowledged') ??
+        nonCompleted.find((r) => r.assignment_status === 'pending') ??
+        null;
 
-      set({ allRoutes: sanitizedRoutes, assignedRoute: active, isLoading: false });
+      set({ allRoutes: sanitizedRoutes, assignedRoute: active, distanceUnit: unit, isLoading: false });
     } catch (e: any) {
       const is404 = e?.response?.status === 404;
       set({
@@ -144,13 +155,27 @@ export const useRouteStore = create<RouteState>((set, get) => ({
         r.route_id === updatedRoute.route_id ? updatedRoute : r,
       );
 
+      const nonCompleted = allRoutes.filter((r) => r.assignment_status !== 'completed');
       const nextActive =
-        allRoutes.find((r) => r.assignment_status !== 'completed') ?? null;
+        nonCompleted.find((r) => r.assignment_status === 'in_progress') ??
+        nonCompleted.find((r) => r.assignment_status === 'acknowledged') ??
+        nonCompleted.find((r) => r.assignment_status === 'pending') ??
+        null;
 
       set({ allRoutes, assignedRoute: nextActive });
     } catch (e: any) {
       console.error('updateStopStatus error:', e);
       throw e;
+    }
+  },
+
+  setDistanceUnit: async (unit: DistanceUnit) => {
+    // Optimistic update
+    set({ distanceUnit: unit });
+    try {
+      await apiClient.patch('/driver/settings', { distance_unit: unit });
+    } catch (e) {
+      console.warn('Failed to persist distance unit setting:', e);
     }
   },
 

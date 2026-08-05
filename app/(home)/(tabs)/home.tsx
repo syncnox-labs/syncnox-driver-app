@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useRouteSocket } from '@/hooks/useRouteSocket';
 import { useRouteStore } from '@/store/route.store';
+import { formatDistance } from '@/utils/distance.utils';
 import { isStopDone, getStopStatus } from '../_components/homeScreen.utils';
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
@@ -123,9 +124,11 @@ function RouteCard({
   const isUpcoming = tab === 'upcoming';
   const isInProgress = route.assignment_status === 'in_progress';
 
+  const distanceUnit = useRouteStore((s) => s.distanceUnit);
+
   // Format distance
   const distanceM = route.total_distance_meters ?? 0;
-  const distanceMi = distanceM > 0 ? `${(distanceM / 1609.34).toFixed(1)} mi` : '—';
+  const distanceMi = formatDistance(distanceM, distanceUnit);
 
   // Format duration
   const durSec = route.total_duration_seconds ?? 0;
@@ -275,7 +278,7 @@ function EmptyTab({ tab }: { tab: RouteTab }) {
 
 // ─── Main Routes Screen ───────────────────────────────────────────────────────
 export default function RoutesScreen() {
-  const { assignedRoute, allRoutes, isLoading, fetchMyRoutes } = useRouteStore();
+  const { assignedRoute, allRoutes, distanceUnit, isLoading, fetchMyRoutes } = useRouteStore();
   const [tab, setTab] = useState<RouteTab>('active');
 
   useRouteSocket();
@@ -298,7 +301,7 @@ export default function RoutesScreen() {
 
   // Distance and duration formatting
   const distanceM = activeRoute?.total_distance_meters ?? 0;
-  const distanceMi = distanceM > 0 ? `${(distanceM / 1609.34).toFixed(1)} mi` : '—';
+  const distanceMi = formatDistance(distanceM, distanceUnit);
   const durSec = activeRoute?.total_duration_seconds ?? 0;
   const durH = Math.floor(durSec / 3600);
   const durMin = Math.floor((durSec % 3600) / 60);
@@ -308,9 +311,18 @@ export default function RoutesScreen() {
   const today = new Date();
   const dateLabel = today.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
-  // Split routes from allRoutes into active vs done tabs
-  const activeRoutes = allRoutes.filter((r) => r.assignment_status !== 'completed');
-  const upcomingRoutes: any[] = []; // real API doesn't return these yet
+  // Split routes from allRoutes into active, upcoming, and done tabs
+  const nonCompleted = allRoutes.filter((r) => r.assignment_status !== 'completed');
+
+  // Active route: in_progress > acknowledged > oldest pending (FIFO)
+  const currentActive =
+    nonCompleted.find((r) => r.assignment_status === 'in_progress') ??
+    nonCompleted.find((r) => r.assignment_status === 'acknowledged') ??
+    nonCompleted.find((r) => r.assignment_status === 'pending') ??
+    null;
+
+  const activeRoutes = currentActive ? [currentActive] : [];
+  const upcomingRoutes = nonCompleted.filter((r) => r.route_id !== currentActive?.route_id);
   const doneRoutes = allRoutes.filter((r) => r.assignment_status === 'completed');
 
   const tabRoutes: Record<RouteTab, any[]> = {
@@ -369,7 +381,7 @@ export default function RoutesScreen() {
               {
                 label: 'Distance',
                 value: distanceMi !== '—' ? distanceMi.split(' ')[0] : '—',
-                sub: distanceMi !== '—' ? ' mi' : '',
+                sub: distanceMi !== '—' ? ` ${distanceMi.split(' ')[1] ?? 'mi'}` : '',
                 color: '#fff',
               },
             ].map((s) => (

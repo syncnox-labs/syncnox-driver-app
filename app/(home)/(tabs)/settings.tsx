@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import GradientBackground from "@/components/ui/GradientBackground";
 import SyncnoxMark from "@/components/SyncnoxMark";
 import { useAuthStore } from "@/store/auth.store";
+import { useRouteStore } from "@/store/route.store";
 
 // ------------------------------------------------------------------ //
 // Settings Section & Row Helpers
@@ -97,6 +98,7 @@ function SettingRow({
 
 export default function SettingsTabScreen() {
   const { logout, driverName, driverId } = useAuthStore();
+  const { distanceUnit, setDistanceUnit } = useRouteStore();
   const [workingNow, setWorkingNow] = useState(true);
   const [useCircleMarkers, setUseCircleMarkers] = useState(false);
 
@@ -128,6 +130,25 @@ export default function SettingsTabScreen() {
       "Diagnostics",
       "Network connection: OK\nWebSocket sync: Active\nLocation services: Enabled\nApp version: v1.0.4",
       [{ text: "Close" }],
+    );
+  };
+
+  const handleDistanceUnitSelect = () => {
+    Alert.alert(
+      "Distance Unit",
+      "Choose your preferred distance unit:",
+      [
+        {
+          text: "Miles (mi)",
+          onPress: () => setDistanceUnit("miles"),
+        },
+        {
+          text: "Kilometers (km)",
+          onPress: () => setDistanceUnit("km"),
+        },
+        { text: "Cancel", style: "cancel" },
+      ],
+      { cancelable: true }
     );
   };
 
@@ -259,6 +280,15 @@ export default function SettingsTabScreen() {
               />
             }
           /> */}
+
+          {/* PREFERENCES section */}
+          <SectionHeader title="Preferences" />
+          <SettingRow
+            icon="speedometer-outline"
+            label="Distance unit"
+            value={distanceUnit === "km" ? "Kilometers (km)" : "Miles (mi)"}
+            onPress={handleDistanceUnitSelect}
+          />
 
           {/* NAVIGATION section */}
           <SectionHeader title="Navigation" />

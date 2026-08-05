@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { useRouteStore } from '@/store/route.store';
+import { formatDistance } from '@/utils/distance.utils';
 import { isStopDone } from '../_components/homeScreen.utils';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
@@ -105,7 +106,7 @@ function CloseIcon() {
 
 // ─── Calendar Screen ──────────────────────────────────────────────────────────
 export default function CalendarScreen() {
-  const { assignedRoute, allRoutes, fetchMyRoutes } = useRouteStore();
+  const { assignedRoute, allRoutes, distanceUnit, fetchMyRoutes } = useRouteStore();
   const today = new Date();
   const [selected, setSelected] = useState(today);
   const [weekAnchor, setWeekAnchor] = useState(today);
@@ -188,7 +189,7 @@ export default function CalendarScreen() {
   const weekHasRoute = week.some((d) => hasRouteOnDay(d));
   const totalStops = weekHasRoute ? (assignedRoute?.stops?.length ?? 0) : 0;
   const distanceM = weekHasRoute ? (assignedRoute?.total_distance_meters ?? 0) : 0;
-  const distanceMi = distanceM > 0 ? `${(distanceM / 1609.34).toFixed(1)} mi` : '0.0 mi';
+  const distanceMi = formatDistance(distanceM, distanceUnit);
 
   // Routes for the selected day
   const selectedRoutes = (allRoutes ?? []).filter(

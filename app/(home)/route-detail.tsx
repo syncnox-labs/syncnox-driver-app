@@ -14,6 +14,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useRouteStore } from '@/store/route.store';
+import { formatDistance } from '@/utils/distance.utils';
 import { RouteStop } from '@/types/route.types';
 import { getStopStatus, isStopDone, formatTime } from './_components/homeScreen.utils';
 
@@ -209,9 +210,11 @@ export default function RouteDetailScreen() {
   // Find the next pending stop to navigate to
   const nextStop = allStops.find((s) => getStopStatus(s) === 'pending');
 
+  const distanceUnit = useRouteStore((s) => s.distanceUnit);
+
   // Distance & time
   const distanceM = route.total_distance_meters ?? 0;
-  const distanceMi = distanceM > 0 ? `${(distanceM / 1609.34).toFixed(1)}\nmi` : '—';
+  const distanceMi = formatDistance(distanceM, distanceUnit, true);
   const durSec = route.total_duration_seconds ?? 0;
   const durH = Math.floor(durSec / 3600);
   const durMin = Math.floor((durSec % 3600) / 60);
