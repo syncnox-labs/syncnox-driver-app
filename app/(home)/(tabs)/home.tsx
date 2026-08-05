@@ -115,10 +115,10 @@ function RouteCard({
 }) {
   const allStops = route.stops ?? [];
   const jobStops = allStops.filter((s: any) => !!s.job);
-  const effectiveStops = jobStops.length > 0 ? jobStops : allStops;
-  const totalStops = effectiveStops.length;
-  const completedStops = effectiveStops.filter((s: any) => isStopDone(s)).length;
-  const pct = totalStops > 0 ? (completedStops / totalStops) * 100 : 0;
+  const totalJobs = jobStops.length > 0 ? jobStops.length : allStops.length;
+  const completedJobs = (jobStops.length > 0 ? jobStops : allStops).filter((s: any) => isStopDone(s)).length;
+  const totalStops = allStops.length;
+  const pct = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0;
   const isActive = tab === 'active';
   const isUpcoming = tab === 'upcoming';
   const isInProgress = route.assignment_status === 'in_progress';
@@ -140,9 +140,7 @@ function RouteCard({
 
   const routeName = route.name ?? `Route #${route.route_id}`;
 
-  const stopsLabel = isUpcoming
-    ? `${totalStops}`
-    : `${completedStops}/${totalStops}`;
+  const jobsLabel = isUpcoming ? `${totalJobs}` : `${completedJobs}/${totalJobs}`;
 
   const pillStatus = isInProgress ? 'in_progress' : tab === 'done' ? 'completed' : tab;
 
@@ -150,14 +148,14 @@ function RouteCard({
     <View style={{ backgroundColor: CARD, borderRadius: 16, marginBottom: 10, overflow: 'hidden' }}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={{ padding: 16, paddingBottom: 14 }}>
         {/* Route Name + status */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, paddingRight: 8 }}>
-            <Text style={{ fontSize: 17, fontWeight: '600', color: '#fff', letterSpacing: -0.3, lineHeight: 22 }} numberOfLines={1}>
-              {routeName}
-            </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+          <Text style={{ fontSize: 17, fontWeight: '600', color: '#fff', letterSpacing: -0.3, lineHeight: 22, flex: 1, flexShrink: 1 }} numberOfLines={1}>
+            {routeName}
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <StatusPill status={pillStatus} />
+            <ChevronRight />
           </View>
-          <ChevronRight />
         </View>
 
         {/* Date + time */}
@@ -175,9 +173,10 @@ function RouteCard({
         </View>
 
         {/* Stats row */}
-        <View style={{ flexDirection: 'row', gap: 20, marginBottom: !isUpcoming ? 12 : 0 }}>
+        <View style={{ flexDirection: 'row', gap: 18, marginBottom: !isUpcoming ? 12 : 0 }}>
           {[
-            { label: 'Stops', value: stopsLabel },
+            { label: 'Jobs', value: jobsLabel },
+            { label: 'Stops', value: `${totalStops}` },
             { label: 'Distance', value: distanceMi },
             { label: 'Est.', value: durationLabel },
           ].map((s) => (

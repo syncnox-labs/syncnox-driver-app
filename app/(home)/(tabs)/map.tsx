@@ -1062,7 +1062,7 @@ export default function MapTabScreen() {
                 Active Route
               </Text>
               <Text style={{ color: "#8E8E93", fontSize: 10 }}>
-                {completedCount}/{jobStops.length} stops completed
+                {completedCount}/{jobStops.length} jobs ({stops.length} stops)
               </Text>
             </View>
           </View>

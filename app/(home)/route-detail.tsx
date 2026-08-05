@@ -201,10 +201,10 @@ export default function RouteDetailScreen() {
 
   const allStops = route.stops ?? [];
   const jobStops = allStops.filter((s) => !!s.job);
-  const effectiveStops = jobStops.length > 0 ? jobStops : allStops;
-  const completedStops = effectiveStops.filter(isStopDone);
-  const totalStops = effectiveStops.length;
-  const pct = totalStops > 0 ? Math.round((completedStops.length / totalStops) * 100) : 0;
+  const totalJobs = jobStops.length > 0 ? jobStops.length : allStops.length;
+  const completedJobs = (jobStops.length > 0 ? jobStops : allStops).filter(isStopDone).length;
+  const totalStops = allStops.length;
+  const pct = totalJobs > 0 ? Math.round((completedJobs / totalJobs) * 100) : 0;
 
   // Find the next pending stop to navigate to
   const nextStop = allStops.find((s) => getStopStatus(s) === 'pending');
@@ -258,13 +258,13 @@ export default function RouteDetailScreen() {
             >
               <BackArrow />
             </TouchableOpacity>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: '#fff', letterSpacing: -0.5, lineHeight: 26 }}>
+            <View style={{ flex: 1, flexShrink: 1 }}>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: '#fff', letterSpacing: -0.5, lineHeight: 26 }} numberOfLines={2}>
                 {route.name ?? `Route #${route.route_id}`}
               </Text>
             </View>
             {isLive && (
-              <View style={{ backgroundColor: 'rgba(48,209,88,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+              <View style={{ backgroundColor: 'rgba(48,209,88,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, flexShrink: 0 }}>
                 <Text style={{ fontSize: 11, fontWeight: '600', color: G }}>Live</Text>
               </View>
             )}
@@ -273,10 +273,10 @@ export default function RouteDetailScreen() {
           {/* ── Stats grid ── */}
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
             {[
-              { label: 'Stops', value: `${completedStops.length}/${totalStops}` },
+              { label: 'Jobs', value: `${completedJobs}/${totalJobs}` },
+              { label: 'Total Stops', value: `${totalStops}` },
               { label: 'Distance', value: distanceMi },
               { label: 'Time', value: durationLabel },
-              { label: 'Score', value: pct > 0 ? `${pct}` : '—' },
             ].map((s) => (
               <View
                 key={s.label}
@@ -387,7 +387,7 @@ export default function RouteDetailScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={{ fontSize: 11, color: LABEL, letterSpacing: 1, marginBottom: 8, paddingLeft: 4, fontFamily: 'monospace', fontWeight: '600' }}>
-            ALL STOPS
+            ALL STOPS ({totalStops})
           </Text>
           <View style={{ backgroundColor: CARD, borderRadius: 16, overflow: 'hidden' }}>
             {allStops.map((stop, i) => (

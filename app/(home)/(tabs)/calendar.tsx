@@ -367,10 +367,10 @@ export default function CalendarScreen() {
               {selectedRoutes.map((route, i) => {
                 const allStops = route.stops ?? [];
                 const jobStops = allStops.filter((s: any) => !!s.job);
-                const effectiveStops = jobStops.length > 0 ? jobStops : allStops;
-                const routeStops = effectiveStops.length;
-                const completedCount = effectiveStops.filter((s: any) => isStopDone(s)).length;
-                const pct = routeStops > 0 ? (completedCount / routeStops) * 100 : 0;
+                const totalJobs = jobStops.length > 0 ? jobStops.length : allStops.length;
+                const completedJobs = (jobStops.length > 0 ? jobStops : allStops).filter((s: any) => isStopDone(s)).length;
+                const totalStops = allStops.length;
+                const pct = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0;
                 const routeName = route.name ?? `Route #${route.route_id}`;
 
                 return (
@@ -395,13 +395,13 @@ export default function CalendarScreen() {
                       <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 99, backgroundColor: G, flexShrink: 0 }} />
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                          <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>{routeName}</Text>
+                          <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff', flex: 1, flexShrink: 1 }} numberOfLines={1}>{routeName}</Text>
                         </View>
                         <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
                           {durationLabel ? (
                             <Text style={{ fontSize: 12, color: LABEL }}>⏱ {durationLabel}</Text>
                           ) : null}
-                          <Text style={{ fontSize: 12, color: LABEL }}>📍 {routeStops} stops</Text>
+                          <Text style={{ fontSize: 12, color: LABEL }}>{completedJobs}/{totalJobs} jobs ({totalStops} stops)</Text>
                         </View>
                         {/* Progress bar */}
                         <View style={{ height: 2, backgroundColor: '#2C2C2E', borderRadius: 99 }}>

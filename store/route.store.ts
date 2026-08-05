@@ -54,23 +54,29 @@ export const useRouteStore = create<RouteState>((set, get) => ({
       const response = await apiClient.get<{ routes: AssignedRoute[] }>('/driver/my-routes');
       const routes = response.data.routes ?? [];
 
-      // Auto-acknowledge the most-recent pending route
-      const pendingRoute = routes.find((r) => r.assignment_status === 'pending');
-      if (pendingRoute) {
-        try {
-          await apiClient.post('/driver/my-route/acknowledge');
-          pendingRoute.assignment_status = 'acknowledged';
-        } catch (_) {
-          // non-fatal
+      // Sanitize routes: if all job stops are completed, mark assignment_status as 'completed'
+      const sanitizedRoutes = routes.map((r) => {
+        const jobStops = r.stops?.filter((s) => !!s.job) ?? [];
+        const isAllDone =
+          jobStops.length > 0 &&
+          jobStops.every(
+            (s) =>
+              !!s.actual_departure_time ||
+              s.job?.status === 'completed' ||
+              s.job?.status === 'failed',
+          );
+        if (isAllDone && r.assignment_status !== 'completed') {
+          return { ...r, assignment_status: 'completed' };
         }
-      }
+        return r;
+      });
 
       // The "active" route is the first non-completed one
-      const active = routes.find(
+      const active = sanitizedRoutes.find(
         (r) => r.assignment_status !== 'completed',
       ) ?? null;
 
-      set({ allRoutes: routes, assignedRoute: active, isLoading: false });
+      set({ allRoutes: sanitizedRoutes, assignedRoute: active, isLoading: false });
     } catch (e: any) {
       const is404 = e?.response?.status === 404;
       set({
@@ -112,14 +118,36 @@ export const useRouteStore = create<RouteState>((set, get) => ({
         };
       });
 
-      const updatedRoute = { ...current, stops: updatedStops };
-      set({ assignedRoute: updatedRoute });
+      const jobStops = updatedStops.filter((s) => !!s.job);
+      const isAllDone =
+        jobStops.length > 0 &&
+        jobStops.every(
+          (s) =>
+            !!s.actual_departure_time ||
+            s.job?.status === 'completed' ||
+            s.job?.status === 'failed',
+        );
 
-      // Also sync the updated route into allRoutes
+      const newAssignmentStatus = isAllDone
+        ? 'completed'
+        : current.assignment_status === 'acknowledged' || current.assignment_status === 'pending'
+        ? 'in_progress'
+        : current.assignment_status;
+
+      const updatedRoute: AssignedRoute = {
+        ...current,
+        stops: updatedStops,
+        assignment_status: newAssignmentStatus,
+      };
+
       const allRoutes = get().allRoutes.map((r) =>
         r.route_id === updatedRoute.route_id ? updatedRoute : r,
       );
-      set({ allRoutes });
+
+      const nextActive =
+        allRoutes.find((r) => r.assignment_status !== 'completed') ?? null;
+
+      set({ allRoutes, assignedRoute: nextActive });
     } catch (e: any) {
       console.error('updateStopStatus error:', e);
       throw e;
