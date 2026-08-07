@@ -159,7 +159,9 @@ function StopRow({
             {name}
           </Text>
           <Text style={{ fontSize: 11, fontWeight: '600', color: cfg.color, flexShrink: 0, marginLeft: 8 }}>
-            {cfg.label}
+            {(status === 'completed' || status === 'failed') && (stop.job?.completed_at || stop.actual_departure_time)
+              ? `${cfg.label} at ${formatTime(stop.job?.completed_at || stop.actual_departure_time)}`
+              : cfg.label}
           </Text>
         </View>
         <Text style={{ fontSize: 13, color: LABEL }} numberOfLines={1}>{address}</Text>
@@ -167,7 +169,13 @@ function StopRow({
           {pkgCount > 0 && (
             <Text style={{ fontSize: 12, color: LABEL }}>📦 {pkgCount} pkg</Text>
           )}
-          {eta ? <Text style={{ fontSize: 12, color: LABEL }}>⏱ {eta}</Text> : null}
+          {(status === 'completed' || status === 'failed') && (stop.job?.completed_at || stop.actual_departure_time) ? (
+            <Text style={{ fontSize: 12, color: cfg.color }}>
+              ⏱ {formatTime(stop.job?.completed_at || stop.actual_departure_time)}
+            </Text>
+          ) : eta ? (
+            <Text style={{ fontSize: 12, color: LABEL }}>⏱ {eta}</Text>
+          ) : null}
         </View>
       </View>
 

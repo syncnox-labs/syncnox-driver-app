@@ -552,7 +552,7 @@ export default function StopDetailScreen() {
           )}
 
           {/* ─── Schedule Details ─── */}
-          {(job?.time_window_start || job?.service_duration || stop.actual_arrival_time || stop.actual_departure_time) && (
+          {(job?.time_window_start || job?.service_duration || stop.actual_arrival_time || stop.actual_departure_time || job?.completed_at) && (
             <View style={{ marginHorizontal: 16 }}>
               <SectionLabel title="SCHEDULE" />
               <View
@@ -569,7 +569,7 @@ export default function StopDetailScreen() {
                     icon="calendar-outline"
                     label="TIME WINDOW"
                     value={`${formatTime(job.time_window_start)}${job.time_window_end ? ' – ' + formatTime(job.time_window_end) : ''}`}
-                    isLast={!job?.service_duration && !stop.actual_arrival_time && !stop.actual_departure_time}
+                    isLast={!job?.service_duration && !stop.actual_arrival_time && !stop.actual_departure_time && !job?.completed_at}
                   />
                 )}
                 {job?.service_duration && (
@@ -577,7 +577,7 @@ export default function StopDetailScreen() {
                     icon="hourglass-outline"
                     label="SERVICE DURATION"
                     value={`${job.service_duration} min`}
-                    isLast={!stop.actual_arrival_time && !stop.actual_departure_time}
+                    isLast={!stop.actual_arrival_time && !stop.actual_departure_time && !job?.completed_at}
                   />
                 )}
                 {stop.actual_arrival_time && (
@@ -586,15 +586,15 @@ export default function StopDetailScreen() {
                     label="ARRIVED AT"
                     value={formatTime(stop.actual_arrival_time)}
                     valueColor="#30D158"
-                    isLast={!stop.actual_departure_time}
+                    isLast={!stop.actual_departure_time && !job?.completed_at}
                   />
                 )}
-                {stop.actual_departure_time && (
+                {(job?.completed_at || stop.actual_departure_time) && (
                   <InfoRow
-                    icon="exit-outline"
-                    label="DEPARTED AT"
-                    value={formatTime(stop.actual_departure_time)}
-                    valueColor="#30D158"
+                    icon={job?.status === 'failed' ? "close-circle-outline" : "checkmark-circle-outline"}
+                    label={job?.status === 'failed' ? "FAILED AT" : "COMPLETED AT"}
+                    value={formatTime(job?.completed_at || stop.actual_departure_time)}
+                    valueColor={job?.status === 'failed' ? "#FF453A" : "#30D158"}
                     isLast
                   />
                 )}

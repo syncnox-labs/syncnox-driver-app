@@ -691,7 +691,9 @@ export default function MapTabScreen() {
                           fontSize: 11,
                         }}
                       >
-                        ETA {formatTime(item.planned_arrival_time)}
+                        {(item.job?.completed_at || item.actual_departure_time)
+                          ? `Done ${formatTime(item.job?.completed_at || item.actual_departure_time)}`
+                          : `ETA ${formatTime(item.planned_arrival_time)}`}
                       </Text>
                     </View>
                   )}

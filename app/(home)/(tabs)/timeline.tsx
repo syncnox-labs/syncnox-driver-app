@@ -118,8 +118,9 @@ export default function TimelineScreen() {
                   `Stop #${stop.sequence_order ?? i + 1}`;
 
                 const address = stop.address_formatted || stop.job?.address_formatted || '';
-                const timeStr = stop.actual_departure_time
-                  ? formatTime(stop.actual_departure_time)
+                const completedTime = stop.job?.completed_at || stop.actual_departure_time;
+                const timeStr = completedTime
+                  ? formatTime(completedTime)
                   : stop.actual_arrival_time
                   ? formatTime(stop.actual_arrival_time)
                   : '';

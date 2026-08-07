@@ -11,6 +11,7 @@ export interface StopJob {
   service_duration?: number; // minutes
   additional_notes?: string;
   status?: string; // "draft" | "assigned" | "in_transit" | "completed" | "failed"
+  completed_at?: string;
   location?: { lat: number; lng: number };
 }
 

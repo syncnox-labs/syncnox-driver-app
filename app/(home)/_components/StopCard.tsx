@@ -55,11 +55,15 @@ export default function StopCard({ stop, onPress }: StopCardProps) {
         ? "#FF453A"
         : "#FF9F0A";
 
+  const completedTime = (stop.job?.completed_at || stop.actual_departure_time)
+    ? formatTime(stop.job?.completed_at || stop.actual_departure_time)
+    : "";
+
   const statusLabel =
     stopStatus === "completed"
-      ? "Completed"
+      ? completedTime ? `Completed at ${completedTime}` : "Completed"
       : stopStatus === "failed"
-        ? "Failed"
+        ? completedTime ? `Failed at ${completedTime}` : "Failed"
         : "Pending";
 
   const statusColor =

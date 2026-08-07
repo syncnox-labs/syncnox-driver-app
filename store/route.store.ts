@@ -119,13 +119,14 @@ export const useRouteStore = create<RouteState>((set, get) => ({
       const current = get().assignedRoute;
       if (!current) return;
 
+      const nowIso = new Date().toISOString();
       const updatedStops: RouteStop[] = current.stops.map((s) => {
         if (s.id !== stopId) return s;
         return {
           ...s,
-          actual_arrival_time: s.actual_arrival_time ?? new Date().toISOString(),
-          actual_departure_time: new Date().toISOString(),
-          job: s.job ? { ...s.job, status } : s.job,
+          actual_arrival_time: s.actual_arrival_time ?? nowIso,
+          actual_departure_time: nowIso,
+          job: s.job ? { ...s.job, status, completed_at: nowIso } : s.job,
         };
       });
 
