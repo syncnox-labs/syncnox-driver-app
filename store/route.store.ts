@@ -34,7 +34,7 @@ export const useRouteStore = create<RouteState>((set, get) => ({
       // Auto-acknowledge when we receive a pending route
       if (route.assignment_status === 'pending') {
         try {
-          await apiClient.post('/driver/my-route/acknowledge');
+          await apiClient.post(`/driver/routes/${route.route_id}/acknowledge`);
           route.assignment_status = 'acknowledged';
         } catch (_) {
           // non-fatal
@@ -101,10 +101,14 @@ export const useRouteStore = create<RouteState>((set, get) => ({
 
   acknowledgeRoute: async () => {
     try {
-      await apiClient.post('/driver/my-route/acknowledge');
       const current = get().assignedRoute;
+      if (!current) return;
+      await apiClient.post(`/driver/routes/${current.route_id}/acknowledge`);
       if (current) {
-        set({ assignedRoute: { ...current, assignment_status: 'acknowledged' } });
+        set(state => ({
+          assignedRoute: state.assignedRoute?.route_id === current.route_id ? { ...state.assignedRoute, assignment_status: 'acknowledged' } : state.assignedRoute,
+          allRoutes: state.allRoutes.map(route => route.route_id === current.route_id ? { ...route, assignment_status: 'acknowledged' } : route),
+        }));
       }
     } catch (e) {
       console.warn('Acknowledge failed:', e);
