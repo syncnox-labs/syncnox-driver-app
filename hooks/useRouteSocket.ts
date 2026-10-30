@@ -6,6 +6,9 @@ import { useAuthStore } from '@/store/auth.store';
 
 const ACTIVATION_CODE_KEY = 'syncnox_activation_code';
 
+// Events that mean the driver's routes changed on the server.
+const ROUTE_EVENTS = ['route_assigned', 'route_updated', 'route_unassigned'];
+
 function getWsBase(): string {
   const rawUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api';
   // Strip /api suffix and convert scheme
@@ -71,15 +74,15 @@ export function useRouteSocket() {
           console.log('[WS] Driver channel connected ✓');
           reconnectDelay.current = 1000; // reset backoff on successful connect
           // Fetch all routes immediately in case we missed a push event
-          fetchMyRoutes();
+          fetchMyRoutes({ silent: true });
         };
 
         ws.onmessage = (event) => {
           try {
             const payload = JSON.parse(event.data);
-            if (payload.event === 'route_assigned') {
-              console.log('[WS] route_assigned received — fetching all routes');
-              fetchMyRoutes();
+            if (ROUTE_EVENTS.includes(payload.event)) {
+              console.log(`[WS] ${payload.event} received — fetching all routes`);
+              fetchMyRoutes({ silent: true });
             }
           } catch (_) {}
         };

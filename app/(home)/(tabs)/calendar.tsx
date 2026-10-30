@@ -10,15 +10,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Svg, { Path, Rect } from 'react-native-svg';
+import { useAuthStore } from '@/store/auth.store';
 import { useRouteStore } from '@/store/route.store';
 import { formatDistance } from '@/utils/distance.utils';
-import { isStopDone } from '../_components/homeScreen.utils';
+import {
+  getRouteLegLabel,
+  groupRouteStops,
+  isStopFinished,
+} from '@/utils/shuttleRoute.utils';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const G = '#30D158';
 const CARD = '#1C1C1E';
 const LABEL = '#8E8E93';
 const SEP = 'rgba(255,255,255,0.08)';
+const BLUE = '#0A84FF';
+const AMBER = '#FF9F0A';
 
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = [
@@ -106,7 +113,8 @@ function CloseIcon() {
 
 // ─── Calendar Screen ──────────────────────────────────────────────────────────
 export default function CalendarScreen() {
-  const { assignedRoute, allRoutes, distanceUnit, fetchMyRoutes } = useRouteStore();
+  const { assignedRoute, allRoutes, distanceUnit, fetchMyRoutes, selectRoute } = useRouteStore();
+  const authTemplate = useAuthStore((s) => s.jobTemplate);
   const today = new Date();
   const [selected, setSelected] = useState(today);
   const [weekAnchor, setWeekAnchor] = useState(today);
@@ -185,24 +193,36 @@ export default function CalendarScreen() {
     return false;
   };
 
+  // Source route list (allRoutes, falling back to assignedRoute)
+  const routePool = allRoutes.length > 0 ? allRoutes : assignedRoute ? [assignedRoute] : [];
+  const weekIsoSet = new Set(week.map(isoOf));
+  const weekRoutes = routePool.filter((r) => {
+    const rIso = r.scheduled_date ? r.scheduled_date.slice(0, 10) : routeDate;
+    return weekIsoSet.has(rIso);
+  });
+
   // Stats for the week
-  const weekHasRoute = week.some((d) => hasRouteOnDay(d));
-  const totalStops = weekHasRoute ? (assignedRoute?.stops?.length ?? 0) : 0;
-  const distanceM = weekHasRoute ? (assignedRoute?.total_distance_meters ?? 0) : 0;
+  const totalStops = weekRoutes.reduce((sum, r) => {
+    const visits = groupRouteStops(r, r.job_template_type ?? authTemplate).filter(
+      (g) => g.kind !== 'start' && g.kind !== 'end',
+    );
+    return sum + visits.length;
+  }, 0);
+  const distanceM = weekRoutes.reduce((sum, r) => sum + (r.total_distance_meters ?? 0), 0);
   const distanceMi = formatDistance(distanceM, distanceUnit);
 
-  // Routes for the selected day
-  const selectedRoutes = (allRoutes ?? []).filter(
-    (r) => r.scheduled_date && r.scheduled_date.slice(0, 10) === isoOf(selected)
-  );
-  if (selectedRoutes.length === 0 && assignedRoute && isoOf(selected) === routeDate) {
-    selectedRoutes.push(assignedRoute);
-  }
-
-  const durSec = assignedRoute?.total_duration_seconds ?? 0;
-  const durH = Math.floor(durSec / 3600);
-  const durMin = Math.floor((durSec % 3600) / 60);
-  const durationLabel = durSec > 0 ? `${durH}h ${durMin}m` : '';
+  // Routes for the selected day (ordered chronologically, GO before RETURN)
+  const selectedIso = isoOf(selected);
+  const selectedRoutes = routePool
+    .filter((r) => (r.scheduled_date ? r.scheduled_date.slice(0, 10) : routeDate) === selectedIso)
+    .sort((a, b) => {
+      const ta = a.stops?.find((s) => s.planned_arrival_time)?.planned_arrival_time ?? '';
+      const tb = b.stops?.find((s) => s.planned_arrival_time)?.planned_arrival_time ?? '';
+      if (ta !== tb) return ta.localeCompare(tb);
+      if (a.leg === 'GO' && b.leg === 'RETURN') return -1;
+      if (a.leg === 'RETURN' && b.leg === 'GO') return 1;
+      return a.route_id - b.route_id;
+    });
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
@@ -325,7 +345,7 @@ export default function CalendarScreen() {
           {/* Week summary strip */}
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
             {[
-              { label: 'Routes this week', value: weekHasRoute ? '1' : '0' },
+              { label: 'Routes this week', value: `${weekRoutes.length}` },
               { label: 'Total stops', value: `${totalStops}` },
               { label: 'Total distance', value: distanceMi },
             ].map((s) => (
@@ -366,23 +386,50 @@ export default function CalendarScreen() {
           ) : (
             <View style={{ backgroundColor: CARD, borderRadius: 16, overflow: 'hidden' }}>
               {selectedRoutes.map((route, i) => {
+                const tpl = route.job_template_type ?? authTemplate ?? 'pickup_delivery_job';
+                const isShuttle = tpl === 'worker_shuttle';
                 const allStops = route.stops ?? [];
-                const jobStops = allStops.filter((s: any) => !!s.job);
-                const totalJobs = jobStops.length > 0 ? jobStops.length : allStops.length;
-                const completedJobs = (jobStops.length > 0 ? jobStops : allStops).filter((s: any) => isStopDone(s)).length;
-                const totalStops = allStops.length;
+                const jobStops = allStops.filter((s) => !!s.job);
+                const visitGroups = groupRouteStops(route, tpl).filter(
+                  (g) => g.kind !== 'start' && g.kind !== 'end',
+                );
+                const totalJobs = jobStops.length > 0 ? jobStops.length : visitGroups.length;
+                const completedJobs = (jobStops.length > 0 ? jobStops : allStops).filter(isStopFinished).length;
+                const visitCount = visitGroups.length > 0 ? visitGroups.length : allStops.length;
                 const pct = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0;
                 const routeName = route.name ?? `Route #${route.route_id}`;
+                const legLabel = getRouteLegLabel(route);
+
+                const uniquePassengers = new Set(
+                  jobStops.map((s) => s.job?.id).filter((id): id is number => id != null),
+                );
+                const passengerTotal = uniquePassengers.size || jobStops.length;
+
+                const durSec = route.total_duration_seconds ?? 0;
+                const durH = Math.floor(durSec / 3600);
+                const durMin = Math.floor((durSec % 3600) / 60);
+                const routeDurationLabel = durSec > 0 ? `${durH}h ${durMin}m` : '';
+
+                const isDone = route.assignment_status === 'completed';
+                const isInProgress = route.assignment_status === 'in_progress';
+                const statusText = isDone ? 'Done' : isInProgress ? 'In Progress' : 'Scheduled';
+                const statusColor = isDone ? LABEL : isInProgress ? G : BLUE;
+                const statusBg = isDone
+                  ? 'rgba(255,255,255,0.06)'
+                  : isInProgress
+                    ? 'rgba(48,209,88,0.12)'
+                    : 'rgba(10,132,255,0.12)';
 
                 return (
                   <TouchableOpacity
-                    key={i}
-                    onPress={() =>
+                    key={route.route_id}
+                    onPress={() => {
+                      selectRoute(route.route_id);
                       router.push({
                         pathname: '/(home)/route-detail' as any,
-                        params: { routeId: route.route_id },
-                      })
-                    }
+                        params: { routeId: String(route.route_id) },
+                      });
+                    }}
                     activeOpacity={0.7}
                     style={{
                       padding: 14,
@@ -393,25 +440,63 @@ export default function CalendarScreen() {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
                       {/* Color stripe */}
-                      <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 99, backgroundColor: G, flexShrink: 0 }} />
+                      <View
+                        style={{
+                          width: 3,
+                          alignSelf: 'stretch',
+                          borderRadius: 99,
+                          backgroundColor: isDone ? '#3A3A3C' : legLabel === 'RETURN' ? BLUE : G,
+                          flexShrink: 0,
+                        }}
+                      />
                       <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                          <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff', flex: 1, flexShrink: 1 }} numberOfLines={1}>{routeName}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                          <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff', flex: 1, flexShrink: 1 }} numberOfLines={1}>
+                            {routeName}
+                          </Text>
+                          {legLabel && (
+                            <View
+                              style={{
+                                backgroundColor: legLabel === 'GO' ? 'rgba(48,209,88,0.14)' : 'rgba(10,132,255,0.16)',
+                                paddingHorizontal: 7,
+                                paddingVertical: 2,
+                                borderRadius: 5,
+                              }}
+                            >
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: legLabel === 'GO' ? G : BLUE }}>
+                                {legLabel}
+                              </Text>
+                            </View>
+                          )}
                         </View>
-                        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
-                          {durationLabel ? (
-                            <Text style={{ fontSize: 12, color: LABEL }}>⏱ {durationLabel}</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
+                          {routeDurationLabel ? (
+                            <Text style={{ fontSize: 12, color: LABEL }}>⏱ {routeDurationLabel}</Text>
                           ) : null}
-                          <Text style={{ fontSize: 12, color: LABEL }}>{completedJobs}/{totalJobs} jobs ({totalStops} stops)</Text>
+                          <Text style={{ fontSize: 12, color: LABEL }}>
+                            {isShuttle
+                              ? `${passengerTotal} passenger${passengerTotal !== 1 ? 's' : ''} (${visitCount} stops)`
+                              : `${completedJobs}/${totalJobs} jobs (${visitCount} stops)`}
+                          </Text>
+                          {route.vehicle?.name ? (
+                            <Text style={{ fontSize: 12, color: LABEL }} numberOfLines={1}>
+                              🚐 {route.vehicle.name}
+                            </Text>
+                          ) : null}
                         </View>
                         {/* Progress bar */}
                         <View style={{ height: 2, backgroundColor: '#2C2C2E', borderRadius: 99 }}>
-                          <View style={{ height: '100%', width: `${pct}%`, backgroundColor: G, borderRadius: 99 }} />
+                          <View style={{ height: '100%', width: `${pct}%`, backgroundColor: isDone ? '#3A3A3C' : G, borderRadius: 99 }} />
                         </View>
-                        <View style={{ marginTop: 6 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: G, backgroundColor: 'rgba(48,209,88,0.1)', paddingHorizontal: 9, paddingVertical: 2, borderRadius: 20, alignSelf: 'flex-start' }}>
-                            {route.assignment_status === 'in_progress' ? 'In Progress' : 'Active'}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: statusColor, backgroundColor: statusBg, paddingHorizontal: 9, paddingVertical: 2, borderRadius: 20 }}>
+                            {statusText}
                           </Text>
+                          {route.is_team_leader && (
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: AMBER, backgroundColor: 'rgba(255,159,10,0.12)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 }}>
+                              Team Leader
+                            </Text>
+                          )}
                         </View>
                       </View>
                     </View>

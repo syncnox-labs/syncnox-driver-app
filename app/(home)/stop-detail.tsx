@@ -14,8 +14,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import GradientBackground from '@/components/ui/GradientBackground';
-import { useRouteStore } from '@/store/route.store';
+import { useRouteStore, findStopInRoutes } from '@/store/route.store';
+import { useAuthStore } from '@/store/auth.store';
 import { RouteStop } from '@/types/route.types';
+import { getStopKind } from '@/utils/shuttleRoute.utils';
+import ShuttleStopScreen from './_components/ShuttleStopScreen';
 
 import {
   formatTime,
@@ -143,14 +146,21 @@ function InfoRow({
 // ─────────────────────────────────────────────────────────────── //
 
 export default function StopDetailScreen() {
-  const { stopId } = useLocalSearchParams<{ stopId: string }>();
-  const { assignedRoute, updateStopStatus } = useRouteStore();
+  const { stopId, routeId, groupStopIds } = useLocalSearchParams<{
+    stopId: string;
+    routeId?: string;
+    groupStopIds?: string;
+  }>();
+  const { allRoutes, updateStopStatus } = useRouteStore();
+  const jobTemplate = useAuthStore((s) => s.jobTemplate);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const stop: RouteStop | undefined = useMemo(
-    () => assignedRoute?.stops.find((s) => s.id === Number(stopId)),
-    [assignedRoute, stopId],
+  // Look the stop up across ALL routes so GO / RETURN / upcoming trips all open correctly.
+  const found = useMemo(
+    () => findStopInRoutes(allRoutes, Number(stopId), routeId ? Number(routeId) : null),
+    [allRoutes, stopId, routeId],
   );
+  const stop: RouteStop | undefined = found?.stop;
 
   // ── Not Found State ──
   if (!stop) {
@@ -175,6 +185,23 @@ export default function StopDetailScreen() {
     );
   }
 
+  // ── Worker shuttle: passenger manifest for every stop at this location ──
+  const template = found?.route.job_template_type ?? jobTemplate;
+  const kind = getStopKind(stop, template);
+  if (template === 'worker_shuttle' && (kind === 'pickup' || kind === 'dropoff') && found) {
+    const ids = (groupStopIds ?? '').split(',').map(Number).filter(Boolean);
+    const groupStops = ids.length
+      ? found.route.stops.filter((s) => ids.includes(s.id))
+      : [stop];
+    return (
+      <ShuttleStopScreen
+        key={groupStops.map((s) => s.id).join('-')}
+        route={found.route}
+        stops={groupStops.length ? groupStops : [stop]}
+      />
+    );
+  }
+
   // ── Data ──
   const job = stop.job;
   const jobType = job?.job_type || stop.stop_type || 'delivery';
@@ -191,11 +218,14 @@ export default function StopDetailScreen() {
     stop.address_formatted || job?.address_formatted || null;
 
   // ── Handlers ──
-  async function handleStatusUpdate(id: number, newStatus: 'completed' | 'failed') {
-    const actionLabel = newStatus === 'completed' ? 'Complete' : 'Mark as Failed';
+  async function handleStatusUpdate(id: number, newStatus: 'completed' | 'failed' | 'pending') {
+    const actionLabel =
+      newStatus === 'completed' ? 'Complete' : newStatus === 'failed' ? 'Mark as Failed' : 'Undo';
     Alert.alert(
       actionLabel,
-      `Are you sure you want to mark this stop as ${newStatus}?`,
+      newStatus === 'pending'
+        ? 'Reset this stop back to pending?'
+        : `Are you sure you want to mark this stop as ${newStatus}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -204,7 +234,7 @@ export default function StopDetailScreen() {
           onPress: async () => {
             setIsSubmitting(true);
             try {
-              await updateStopStatus(id, newStatus);
+              await updateStopStatus(id, newStatus, { routeId: found?.route.route_id });
               router.back();
             } catch {
               Alert.alert('Error', 'Failed to update stop status. Please try again.');
@@ -635,6 +665,32 @@ export default function StopDetailScreen() {
                 </Text>
               </View>
             </View>
+          )}
+
+          {/* ─── Undo (finished stops can be corrected while the route is open) ─── */}
+          {isDone && (
+            <TouchableOpacity
+              onPress={() => handleStatusUpdate(stop.id, 'pending')}
+              disabled={isSubmitting}
+              style={{
+                marginHorizontal: 16,
+                marginTop: 24,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                paddingVertical: 14,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: 'rgba(255,159,10,0.25)',
+                backgroundColor: 'rgba(255,159,10,0.06)',
+                opacity: isSubmitting ? 0.4 : 1,
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-undo-outline" size={16} color="#FF9F0A" />
+              <Text style={{ color: '#FF9F0A', fontSize: 13, fontWeight: '600' }}>Undo — set back to pending</Text>
+            </TouchableOpacity>
           )}
 
           {/* ─── Mark Failed (pending only) ─── */}

@@ -1,8 +1,18 @@
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useAuthStore } from "@/store/auth.store";
 import { RouteStop } from "@/types/route.types";
-import { formatTime, getJobTypeLabel, getStopStatus } from "./homeScreen.utils";
+import {
+  getDoneLabel,
+  getFailLabel,
+  getKindLabel,
+  getStopKind,
+  getStopPassenger,
+  getStopProgress,
+  isShuttleStop,
+} from "@/utils/shuttleRoute.utils";
+import { formatTime } from "./homeScreen.utils";
 
 interface StopCardProps {
   stop: RouteStop;
@@ -10,20 +20,33 @@ interface StopCardProps {
 }
 
 export default function StopCard({ stop, onPress }: StopCardProps) {
-  const stopStatus = getStopStatus(stop);
-  const isDone = stopStatus !== "pending";
-  const jobType = stop.job?.job_type || stop.stop_type || "delivery";
+  const authTemplate = useAuthStore((s) => s.jobTemplate);
+  const template = stop.job?.job_template_type ?? authTemplate ?? "pickup_delivery_job";
+  const shuttle = isShuttleStop(stop, template);
+  const kind = getStopKind(stop, template);
+  const stopStatus = getStopProgress(stop);
 
   // Format Label & Time
-  const jobLabel = getJobTypeLabel(jobType);
+  const kindLabel = getKindLabel(kind, template);
+  const passenger = shuttle && stop.job ? getStopPassenger(stop) : null;
+  const titleLabel = passenger ? `${kindLabel} · ${passenger.name}` : kindLabel;
   const timeLabel = formatTime(stop.planned_arrival_time);
-  const address = stop.job?.address_formatted || "No Address Provided";
+  const address = stop.address_formatted || stop.job?.address_formatted || "No Address Provided";
   const duration = stop.job?.service_duration;
   const stopNum = stop.sequence_order ?? "–";
 
-  // Get Custom Icon based on Job Type
+  // Get Custom Icon based on Stop Kind
   const getIcon = () => {
-    switch (jobType.toLowerCase()) {
+    if (shuttle) {
+      return (
+        <MaterialCommunityIcons
+          name={kind === "dropoff" ? "map-marker-check" : "account-arrow-up"}
+          size={24}
+          color="#30D158"
+        />
+      );
+    }
+    switch (kind) {
       case "pickup":
         return (
           <MaterialCommunityIcons
@@ -53,25 +76,26 @@ export default function StopCard({ stop, onPress }: StopCardProps) {
       ? "#30D158"
       : stopStatus === "failed"
         ? "#FF453A"
-        : "#FF9F0A";
+        : stopStatus === "skipped"
+          ? "#8E8E93"
+          : "#FF9F0A";
 
-  const completedTime = (stop.job?.completed_at || stop.actual_departure_time)
-    ? formatTime(stop.job?.completed_at || stop.actual_departure_time)
+  const completedTime = (stop.actual_departure_time || stop.job?.completed_at)
+    ? formatTime(stop.actual_departure_time || stop.job?.completed_at)
     : "";
 
+  const doneText = getDoneLabel(kind, template);
+  const failText = getFailLabel(kind, template);
   const statusLabel =
     stopStatus === "completed"
-      ? completedTime ? `Completed at ${completedTime}` : "Completed"
+      ? completedTime ? `${doneText} at ${completedTime}` : doneText
       : stopStatus === "failed"
-        ? completedTime ? `Failed at ${completedTime}` : "Failed"
-        : "Pending";
+        ? completedTime ? `${failText} at ${completedTime}` : failText
+        : stopStatus === "skipped"
+          ? "Skipped"
+          : "Pending";
 
-  const statusColor =
-    stopStatus === "completed"
-      ? "#30D158"
-      : stopStatus === "failed"
-        ? "#FF453A"
-        : "#FF9F0A";
+  const statusColor = dotColor;
 
   return (
     <TouchableOpacity
@@ -107,7 +131,7 @@ export default function StopCard({ stop, onPress }: StopCardProps) {
               className="text-[17px] font-bold text-text-primary flex-1 mr-2"
               numberOfLines={1}
             >
-              {jobLabel} — {timeLabel}
+              {titleLabel} — {timeLabel}
             </Text>
             <Ionicons name="chevron-forward" size={18} color="#30D158" />
           </View>

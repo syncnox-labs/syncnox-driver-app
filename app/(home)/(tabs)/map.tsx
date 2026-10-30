@@ -15,15 +15,22 @@ import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 // import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
-import { useRouteStore } from "@/store/route.store";
-import { useRouteSocket } from "@/hooks/useRouteSocket";
+import { router } from "expo-router";
+import { useAuthStore } from "@/store/auth.store";
+import { selectViewedRoute, useRouteStore } from "@/store/route.store";
 import { RouteStop } from "@/types/route.types";
 import {
-  formatTime,
-  getJobTypeLabel,
-  getStopStatus,
-} from "../_components/homeScreen.utils";
+  formatWaiting,
+  getDoneLabel,
+  getFailLabel,
+  getGroupPassengers,
+  getKindLabel,
+  getRouteLegLabel,
+  GroupedRouteStop,
+  groupRouteStops,
+  isStopFinished,
+} from "@/utils/shuttleRoute.utils";
+import { formatTime } from "../_components/homeScreen.utils";
 
 const { width } = Dimensions.get("window");
 
@@ -254,111 +261,133 @@ function decodePolyline(encoded: string): { latitude: number; longitude: number 
 const DEFAULT_LATITUDE = 22.8219;
 const DEFAULT_LONGITUDE = 72.8282;
 
+function getStopCoords(stop?: RouteStop | null): { latitude: number; longitude: number } | null {
+  if (!stop) return null;
+  const lat = stop.location?.lat ?? stop.job?.location?.lat;
+  const lng = stop.location?.lng ?? stop.job?.location?.lng;
+  if (typeof lat !== "number" || typeof lng !== "number") return null;
+  return { latitude: lat, longitude: lng };
+}
+
 export default function MapTabScreen() {
-  const { assignedRoute, isLoading, fetchMyRoute } = useRouteStore();
+  const viewedRoute = useRouteStore(selectViewedRoute);
+  const allRoutes = useRouteStore((s) => s.allRoutes);
+  const selectRoute = useRouteStore((s) => s.selectRoute);
+  const isLoading = useRouteStore((s) => s.isLoading);
+  const fetchMyRoutes = useRouteStore((s) => s.fetchMyRoutes);
+  const authTemplate = useAuthStore((s) => s.jobTemplate);
+
   const [selectedStopIndex, setSelectedStopIndex] = useState<number>(0);
   const [tracksChanges, setTracksChanges] = useState<boolean>(true);
   const insets = useSafeAreaInsets();
 
-  // Reset and toggle tracksChanges whenever assignedRoute is loaded/updated
+  const template = viewedRoute?.job_template_type ?? authTemplate ?? "pickup_delivery_job";
+  const isShuttle = template === "worker_shuttle";
+
+  useEffect(() => {
+    if (allRoutes.length === 0) {
+      fetchMyRoutes();
+    }
+  }, []);
+
+  // Reset and toggle tracksChanges whenever viewedRoute is loaded/updated
   // to allow async vector fonts and SVGs to fully render before caching for performance
   useEffect(() => {
-    setTracksChanges(true);
-    // Give async SVG/font rendering ample time before Android caches the bitmap
-    const timer = setTimeout(() => {
+    const startTimer = setTimeout(() => {
+      setTracksChanges(true);
+    }, 0);
+    const endTimer = setTimeout(() => {
       setTracksChanges(false);
     }, 2500);
-    return () => clearTimeout(timer);
-  }, [assignedRoute]);
+    return () => {
+      clearTimeout(startTimer);
+      clearTimeout(endTimer);
+    };
+  }, [viewedRoute]);
 
   const mapRef = useRef<MapView>(null);
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlatList<GroupedRouteStop>>(null);
   const isScrollingRef = useRef<boolean>(false);
 
-  useRouteSocket();
-
-  // Auto-refresh the route data whenever the driver focuses/opens the Map tab
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchMyRoute();
-    }, []),
+  const groups = useMemo(
+    () => (viewedRoute ? groupRouteStops(viewedRoute, template) : []),
+    [viewedRoute, template],
+  );
+  const visitGroups = useMemo(
+    () => groups.filter((g) => g.kind !== "start" && g.kind !== "end"),
+    [groups],
+  );
+  const groupsWithCoords = useMemo(
+    () => groups.filter((g) => getStopCoords(g.representative) !== null),
+    [groups],
   );
 
-  const stops = assignedRoute?.stops ?? [];
+  // Switchable open routes (e.g. GO + RETURN legs on the same day)
+  const openRoutes = useMemo(
+    () => allRoutes.filter((r) => r.assignment_status !== "completed"),
+    [allRoutes],
+  );
 
-  // Defensively match coordinates from either root location or job location
-  const stopsWithCoords = stops.filter((stop) => {
-    const lat = stop.location?.lat || stop.job?.location?.lat;
-    const lng = stop.location?.lng || stop.job?.location?.lng;
-    return (
-      lat !== undefined && lat !== null && lng !== undefined && lng !== null
-    );
-  });
-
+  const routePolyline = viewedRoute?.route_polyline;
   const polylineCoords = useMemo(() => {
-    if (assignedRoute?.route_polyline) {
+    if (routePolyline) {
       try {
-        return decodePolyline(assignedRoute.route_polyline);
+        return decodePolyline(routePolyline);
       } catch (e) {
         console.warn("Failed to decode route_polyline", e);
       }
     }
-    return stopsWithCoords.map((stop) => {
-      const lat = stop.location?.lat || stop.job!.location!.lat;
-      const lng = stop.location?.lng || stop.job!.location!.lng;
-      return { latitude: lat, longitude: lng };
-    });
-  }, [assignedRoute?.route_polyline, stopsWithCoords]);
+    return groupsWithCoords.map((g) => getStopCoords(g.representative)!);
+  }, [routePolyline, groupsWithCoords]);
 
-  // Auto-fit map coordinates on load or route update, and focus on the current pending stop
+  const activeRouteId = viewedRoute?.route_id;
+  // Auto-fit map coordinates when switching routes, and focus on the first pending visit
   useEffect(() => {
-    if (stopsWithCoords.length > 0 && mapRef.current) {
-      const coordinates = stopsWithCoords.map((stop) => {
-        const lat = stop.location?.lat || stop.job!.location!.lat;
-        const lng = stop.location?.lng || stop.job!.location!.lng;
-        return { latitude: lat, longitude: lng };
-      });
-
-      // Find first pending stop as default selected stop
-      const firstPendingIndex = stops.findIndex(
-        (s) => getStopStatus(s) === "pending",
+    const timer = setTimeout(() => {
+      if (groups.length === 0) {
+        setSelectedStopIndex(0);
+        return;
+      }
+      const firstPendingIndex = groups.findIndex(
+        (g) => g.kind !== "start" && g.kind !== "end" && (g.progress === "pending" || g.progress === "partial"),
       );
       const targetIndex = firstPendingIndex !== -1 ? firstPendingIndex : 0;
       setSelectedStopIndex(targetIndex);
 
-      const currentStop = stops[targetIndex];
-      const targetLat =
-        currentStop?.location?.lat || currentStop?.job?.location?.lat;
-      const targetLng =
-        currentStop?.location?.lng || currentStop?.job?.location?.lng;
+      if (groupsWithCoords.length > 0 && mapRef.current) {
+        const coordinates = groupsWithCoords.map((g) => getStopCoords(g.representative)!);
+        const targetCoords = getStopCoords(groups[targetIndex]?.representative);
 
-      // Fit coordinates and then animate camera to focus on the active stop
-      setTimeout(() => {
-        flatListRef.current?.scrollToIndex({
-          index: targetIndex,
-          animated: false,
-        });
+        if (targetIndex < groups.length) {
+          flatListRef.current?.scrollToIndex({
+            index: targetIndex,
+            animated: false,
+          });
+        }
 
-        if (targetLat && targetLng && mapRef.current) {
+        if (targetCoords && mapRef.current) {
           mapRef.current.animateToRegion(
             {
-              latitude: targetLat,
-              longitude: targetLng,
+              latitude: targetCoords.latitude,
+              longitude: targetCoords.longitude,
               latitudeDelta: 0.012,
               longitudeDelta: 0.012,
             },
             800,
           );
         } else {
-          // Fallback: Fit all stops if active stop has no valid coords
           mapRef.current?.fitToCoordinates(coordinates, {
             edgePadding: { top: 80, right: 50, bottom: 240, left: 50 },
             animated: true,
           });
         }
-      }, 600);
-    }
-  }, [assignedRoute]);
+      }
+    }, 450);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRouteId]);
+
+  const safeSelectedIndex = groups.length > 0 ? Math.min(selectedStopIndex, groups.length - 1) : 0;
 
   // Synchronize Scroll & Map Center
   const handleScroll = (event: any) => {
@@ -367,18 +396,15 @@ export default function MapTabScreen() {
     const contentOffset = event.nativeEvent.contentOffset.x;
     const index = Math.round(contentOffset / width);
 
-    if (index >= 0 && index < stops.length && index !== selectedStopIndex) {
+    if (index >= 0 && index < groups.length && index !== selectedStopIndex) {
       setSelectedStopIndex(index);
 
-      const stop = stops[index];
-      const lat = stop.location?.lat || stop.job?.location?.lat;
-      const lng = stop.location?.lng || stop.job?.location?.lng;
-
-      if (lat && lng && mapRef.current) {
+      const coords = getStopCoords(groups[index]?.representative);
+      if (coords && mapRef.current) {
         mapRef.current.animateToRegion(
           {
-            latitude: lat,
-            longitude: lng,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
             latitudeDelta: 0.012,
             longitudeDelta: 0.012,
           },
@@ -388,8 +414,8 @@ export default function MapTabScreen() {
     }
   };
 
-  // Helper to focus map & flatlist on a stop
-  const zoomToStop = (stop: RouteStop, index: number) => {
+  // Helper to focus map & flatlist on a grouped stop
+  const zoomToGroup = (group: GroupedRouteStop, index: number) => {
     setSelectedStopIndex(index);
 
     isScrollingRef.current = true;
@@ -399,14 +425,12 @@ export default function MapTabScreen() {
       isScrollingRef.current = false;
     }, 500);
 
-    const lat = stop.location?.lat || stop.job?.location?.lat;
-    const lng = stop.location?.lng || stop.job?.location?.lng;
-
-    if (lat && lng && mapRef.current) {
+    const coords = getStopCoords(group.representative);
+    if (coords && mapRef.current) {
       mapRef.current.animateToRegion(
         {
-          latitude: lat,
-          longitude: lng,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
           latitudeDelta: 0.012,
           longitudeDelta: 0.012,
         },
@@ -416,32 +440,27 @@ export default function MapTabScreen() {
   };
 
   const handleNext = () => {
-    if (selectedStopIndex < stops.length - 1) {
-      zoomToStop(stops[selectedStopIndex + 1], selectedStopIndex + 1);
+    if (safeSelectedIndex < groups.length - 1) {
+      zoomToGroup(groups[safeSelectedIndex + 1], safeSelectedIndex + 1);
     }
   };
 
   const handlePrev = () => {
-    if (selectedStopIndex > 0) {
-      zoomToStop(stops[selectedStopIndex - 1], selectedStopIndex - 1);
+    if (safeSelectedIndex > 0) {
+      zoomToGroup(groups[safeSelectedIndex - 1], safeSelectedIndex - 1);
     }
   };
 
-  // Completed stops count for header
-  const completedCount = stops.filter(
-    (s) => getStopStatus(s) === "completed",
-  ).length;
-  const jobStops = stops.filter((s) => s.job);
+  const jobStops = (viewedRoute?.stops ?? []).filter((s) => !!s.job);
+  const completedCount = jobStops.filter(isStopFinished).length;
 
-  const getMarkerStyle = (stop: RouteStop, index: number) => {
-    const isSelected = selectedStopIndex === index;
-    const isDepot =
-      stop.stop_type?.toLowerCase().includes("depot") || !stop.job;
-    const status = getStopStatus(stop);
+  const getMarkerStyle = (group: GroupedRouteStop, index: number): PinStyle => {
+    const isSelected = safeSelectedIndex === index;
+    const isTerminal = group.kind === "start" || group.kind === "end";
 
-    if (isDepot) {
+    if (isTerminal) {
       return {
-        bg: isSelected ? "#30D158" : "#4A5568", // iOS Green if selected, Slate Grey if unselected
+        bg: isSelected ? "#30D158" : "#4A5568",
         border: "#FFFFFF",
         text: isSelected ? "#000000" : "#FFFFFF",
         size: isSelected ? 38 : 32,
@@ -450,10 +469,10 @@ export default function MapTabScreen() {
         glow: isSelected,
       };
     }
-    if (status === "completed") {
+    if (group.progress === "completed") {
       return {
         bg: isSelected ? "#30D158" : "#FFFFFF",
-        border: isSelected ? "#FFFFFF" : "#30D158", // iOS Green border so stem is visible
+        border: isSelected ? "#FFFFFF" : "#30D158",
         text: "#000000",
         size: isSelected ? 38 : 32,
         icon: undefined,
@@ -461,9 +480,9 @@ export default function MapTabScreen() {
         glow: isSelected,
       };
     }
-    if (status === "failed") {
+    if (group.progress === "failed") {
       return {
-        bg: isSelected ? "#30D158" : "#FF453A", // iOS Green if selected, iOS Red if failed
+        bg: isSelected ? "#30D158" : "#FF453A",
         border: "#FFFFFF",
         text: isSelected ? "#000000" : "#FFFFFF",
         size: isSelected ? 38 : 32,
@@ -472,9 +491,20 @@ export default function MapTabScreen() {
         glow: isSelected,
       };
     }
-    // pending
+    if (group.progress === "skipped") {
+      return {
+        bg: isSelected ? "#30D158" : "#636366",
+        border: "#FFFFFF",
+        text: isSelected ? "#000000" : "#FFFFFF",
+        size: isSelected ? 38 : 32,
+        icon: undefined,
+        iconSize: 0,
+        glow: isSelected,
+      };
+    }
+    // pending / partial
     return {
-      bg: isSelected ? "#30D158" : "#FF9F0A", // iOS Green if selected, iOS Orange/Amber if pending
+      bg: isSelected ? "#30D158" : "#FF9F0A",
       border: "#FFFFFF",
       text: isSelected ? "#000000" : "#FFFFFF",
       size: isSelected ? 38 : 32,
@@ -523,9 +553,9 @@ export default function MapTabScreen() {
 
   // Open native maps for navigation
   const openNavigation = (stop: RouteStop) => {
-    const lat = stop.location?.lat || stop.job?.location?.lat;
-    const lng = stop.location?.lng || stop.job?.location?.lng;
-    if (!lat || !lng) return;
+    const coords = getStopCoords(stop);
+    if (!coords) return;
+    const { latitude: lat, longitude: lng } = coords;
     const url = Platform.select({
       ios: `maps://app?daddr=${lat},${lng}`,
       default: `google.navigation:q=${lat},${lng}`,
@@ -537,48 +567,98 @@ export default function MapTabScreen() {
     );
   };
 
-  const renderStopSlide = ({
-    item,
-    index,
+  const renderGroupSlide = ({
+    item: group,
   }: {
-    item: RouteStop;
+    item: GroupedRouteStop;
     index: number;
   }) => {
-    const isDepot =
-      item.stop_type?.toLowerCase().includes("depot") || !item.job;
-    const status = getStopStatus(item);
+    const rep = group.representative;
+    const isTerminal = group.kind === "start" || group.kind === "end";
+    const hasCoords = getStopCoords(rep) !== null;
+    const passengers = isTerminal ? [] : getGroupPassengers(group);
+    const waitingText = formatWaiting(rep.waiting_time_to_next_stop_seconds);
 
-    const statusConfig = {
-      completed: {
-        color: "#30D158",
-        bg: "rgba(48,209,88,0.1)",
-        label: "COMPLETED",
-        icon: "checkmark-circle" as const,
-      },
-      failed: {
-        color: "#FF453A",
-        bg: "rgba(255,69,58,0.1)",
-        label: "FAILED",
-        icon: "close-circle" as const,
-      },
-      pending: {
-        color: "#FF9F0A",
-        bg: "rgba(255,159,10,0.1)",
-        label: "PENDING",
-        icon: "time" as const,
-      },
-    }[status];
+    const statusConfig = (() => {
+      if (isTerminal) {
+        return {
+          color: "#30D158",
+          bg: "rgba(48,209,88,0.1)",
+          label: group.kind === "start" ? "START" : "END",
+          icon: "flag" as const,
+        };
+      }
+      switch (group.progress) {
+        case "completed":
+          return {
+            color: "#30D158",
+            bg: "rgba(48,209,88,0.1)",
+            label: getDoneLabel(group.kind, template).toUpperCase(),
+            icon: "checkmark-circle" as const,
+          };
+        case "failed":
+          return {
+            color: "#FF453A",
+            bg: "rgba(255,69,58,0.1)",
+            label: getFailLabel(group.kind, template).toUpperCase(),
+            icon: "close-circle" as const,
+          };
+        case "skipped":
+          return {
+            color: "#8E8E93",
+            bg: "rgba(142,142,147,0.15)",
+            label: "SKIPPED",
+            icon: "remove-circle-outline" as const,
+          };
+        case "partial":
+          return {
+            color: "#0A84FF",
+            bg: "rgba(10,132,255,0.14)",
+            label: `${group.finishedCount}/${group.stops.length} DONE`,
+            icon: "people" as const,
+          };
+        default:
+          return {
+            color: "#FF9F0A",
+            bg: "rgba(255,159,10,0.1)",
+            label: "PENDING",
+            icon: "time" as const,
+          };
+      }
+    })();
 
-    const title = isDepot
-      ? "Warehouse Depot"
-      : getJobTypeLabel(item.job?.job_type || "delivery");
+    const kindLabel = getKindLabel(group.kind, template);
+    const title = isTerminal
+      ? group.kind === "start"
+        ? viewedRoute?.depot && !isShuttle
+          ? viewedRoute.depot.name || "Start Depot"
+          : "Start Location"
+        : viewedRoute?.depot && !isShuttle
+          ? viewedRoute.depot.name || "End Depot"
+          : "End Location"
+      : isShuttle
+        ? group.passengerCount > 1
+          ? `${kindLabel} · ${group.passengerCount} passengers`
+          : `${kindLabel}${passengers[0]?.name ? ` · ${passengers[0].name}` : ""}`
+        : kindLabel;
+
     const address =
-      item.address_formatted ||
-      item.job?.address_formatted ||
+      rep.address_formatted ||
+      rep.job?.address_formatted ||
+      (isTerminal && viewedRoute?.depot?.address_formatted) ||
       "No address provided";
-    const contactName = item.job?.first_name
-      ? `${item.job.first_name}${item.job.last_name ? ` ${item.job.last_name}` : ""}`
+
+    const contactSummary = !isTerminal
+      ? isShuttle
+        ? group.passengerCount > 1
+          ? `${group.finishedCount}/${group.passengerCount} checked`
+          : passengers[0]?.name ?? null
+        : rep.job?.first_name
+          ? `${rep.job.first_name}${rep.job.last_name ? ` ${rep.job.last_name}` : ""}`
+          : rep.job?.business_name ?? null
       : null;
+
+    const doneTimestamp = rep.actual_departure_time || rep.job?.completed_at;
 
     return (
       <View style={{ width, paddingHorizontal: 16 }}>
@@ -633,29 +713,34 @@ export default function MapTabScreen() {
                     justifyContent: "center",
                   }}
                 >
-                  {isDepot ? (
+                  {isTerminal ? (
                     <Ionicons
-                      name="home"
+                      name={group.kind === "start" ? "play-circle" : "flag"}
                       size={17}
+                      color={statusConfig.color}
+                    />
+                  ) : isShuttle ? (
+                    <MaterialCommunityIcons
+                      name={
+                        group.kind === "dropoff"
+                          ? "map-marker-check"
+                          : group.passengerCount > 1
+                            ? "account-group"
+                            : "account-arrow-up"
+                      }
+                      size={18}
                       color={statusConfig.color}
                     />
                   ) : (
                     <MaterialCommunityIcons
                       name={
-                        (item.job?.job_type || "delivery").toLowerCase() ===
-                        "pickup"
+                        group.kind === "pickup"
                           ? "package-variant-minus"
-                          : (item.job?.job_type || "delivery").toLowerCase() ===
-                              "service"
+                          : group.kind === "service"
                             ? "wrench-clock"
                             : "truck-fast"
                       }
-                      size={
-                        (item.job?.job_type || "delivery").toLowerCase() ===
-                        "service"
-                          ? 15
-                          : 18
-                      }
+                      size={group.kind === "service" ? 15 : 18}
                       color={statusConfig.color}
                     />
                   )}
@@ -671,7 +756,7 @@ export default function MapTabScreen() {
                   >
                     {title}
                   </Text>
-                  {item.planned_arrival_time && (
+                  {(rep.planned_arrival_time || doneTimestamp) && (
                     <View
                       style={{
                         flexDirection: "row",
@@ -691,9 +776,11 @@ export default function MapTabScreen() {
                           fontSize: 11,
                         }}
                       >
-                        {(item.job?.completed_at || item.actual_departure_time)
-                          ? `Done ${formatTime(item.job?.completed_at || item.actual_departure_time)}`
-                          : `ETA ${formatTime(item.planned_arrival_time)}`}
+                        {group.progress === "completed" && doneTimestamp
+                          ? `Done ${formatTime(doneTimestamp)}`
+                          : rep.planned_arrival_time
+                            ? `ETA ${formatTime(rep.planned_arrival_time)}`
+                            : ""}
                       </Text>
                     </View>
                   )}
@@ -725,7 +812,7 @@ export default function MapTabScreen() {
                     letterSpacing: 0.5,
                   }}
                 >
-                  {isDepot ? "DEPOT" : statusConfig.label}
+                  {statusConfig.label}
                 </Text>
               </View>
             </View>
@@ -758,16 +845,17 @@ export default function MapTabScreen() {
               </Text>
             </View>
 
-            {/* Row 3: Contact + Stop # chips */}
+            {/* Row 3: Contact + Stop # + Waiting chips */}
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
+                flexWrap: "wrap",
                 gap: 6,
                 marginBottom: 14,
               }}
             >
-              {!isDepot && (
+              {!isTerminal && group.displayNumber != null && (
                 <View
                   style={{
                     backgroundColor: "rgba(255,255,255,0.04)",
@@ -791,11 +879,11 @@ export default function MapTabScreen() {
                       fontWeight: "600",
                     }}
                   >
-                    Stop {item.sequence_order ?? index + 1} of {jobStops.length}
+                    Stop {group.displayNumber} of {visitGroups.length}
                   </Text>
                 </View>
               )}
-              {contactName && (
+              {contactSummary && (
                 <View
                   style={{
                     backgroundColor: "rgba(255,255,255,0.04)",
@@ -805,10 +893,11 @@ export default function MapTabScreen() {
                     flexDirection: "row",
                     alignItems: "center",
                     gap: 4,
+                    maxWidth: "60%",
                   }}
                 >
                   <Ionicons
-                    name="person"
+                    name={group.passengerCount > 1 ? "people" : "person"}
                     size={10}
                     color="rgba(48,209,88,0.6)"
                   />
@@ -820,7 +909,31 @@ export default function MapTabScreen() {
                     }}
                     numberOfLines={1}
                   >
-                    {contactName}
+                    {contactSummary}
+                  </Text>
+                </View>
+              )}
+              {waitingText && (
+                <View
+                  style={{
+                    backgroundColor: "rgba(255,159,10,0.12)",
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 6,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <Ionicons name="hourglass-outline" size={10} color="#FF9F0A" />
+                  <Text
+                    style={{
+                      color: "#FF9F0A",
+                      fontSize: 10,
+                      fontWeight: "600",
+                    }}
+                  >
+                    Wait {waitingText}
                   </Text>
                 </View>
               )}
@@ -831,47 +944,52 @@ export default function MapTabScreen() {
               style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
               {/* Navigate button */}
-              {!isDepot && status === "pending" && (
-                <TouchableOpacity
-                  onPress={() => openNavigation(item)}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6,
-                    backgroundColor: "#30D158",
-                    borderRadius: 12,
-                    paddingVertical: 11,
-                    paddingHorizontal: 16,
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="navigate" size={14} color="#000000" />
-                  <Text
+              {hasCoords &&
+                (isTerminal || group.progress === "pending" || group.progress === "partial") && (
+                  <TouchableOpacity
+                    onPress={() => openNavigation(rep)}
                     style={{
-                      color: "#000000",
-                      fontSize: 13,
-                      fontWeight: "700",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      backgroundColor: "#30D158",
+                      borderRadius: 12,
+                      paddingVertical: 11,
+                      paddingHorizontal: 16,
                     }}
+                    activeOpacity={0.8}
                   >
-                    Navigate
-                  </Text>
-                </TouchableOpacity>
-              )}
+                    <Ionicons name="navigate" size={14} color="#000000" />
+                    <Text
+                      style={{
+                        color: "#000000",
+                        fontSize: 13,
+                        fontWeight: "700",
+                      }}
+                    >
+                      Navigate
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
-              {/* View Details */}
+              {/* View Details / Manifest */}
               <TouchableOpacity
                 onPress={() => {
-                  if (isDepot) {
+                  if (isTerminal) {
                     Alert.alert(
-                      "Depot Station",
-                      "This stop represents the fleet warehouse base depot.",
+                      group.kind === "start" ? "Start Location" : "End Location",
+                      address,
                     );
                     return;
                   }
                   router.push({
                     pathname: "/(home)/stop-detail",
-                    params: { stopId: item.id },
+                    params: {
+                      stopId: String(rep.id),
+                      routeId: viewedRoute ? String(viewedRoute.route_id) : undefined,
+                      groupStopIds: group.stops.map((s) => s.id).join(","),
+                    },
                   });
                 }}
                 style={{
@@ -890,9 +1008,11 @@ export default function MapTabScreen() {
               >
                 <Ionicons
                   name={
-                    isDepot
+                    isTerminal
                       ? "information-circle-outline"
-                      : "document-text-outline"
+                      : isShuttle && group.passengerCount > 1
+                        ? "people-outline"
+                        : "document-text-outline"
                   }
                   size={14}
                   color="#30D158"
@@ -900,14 +1020,18 @@ export default function MapTabScreen() {
                 <Text
                   style={{ color: "white", fontSize: 13, fontWeight: "600" }}
                 >
-                  {isDepot ? "Info" : "Details"}
+                  {isTerminal
+                    ? "Info"
+                    : isShuttle && group.passengerCount > 1
+                      ? "Manifest"
+                      : "Details"}
                 </Text>
               </TouchableOpacity>
 
               {/* Prev / Next */}
               <TouchableOpacity
                 onPress={handlePrev}
-                disabled={selectedStopIndex === 0}
+                disabled={safeSelectedIndex === 0}
                 style={{
                   width: 40,
                   height: 40,
@@ -915,7 +1039,7 @@ export default function MapTabScreen() {
                   alignItems: "center",
                   justifyContent: "center",
                   backgroundColor: "rgba(255,255,255,0.04)",
-                  opacity: selectedStopIndex === 0 ? 0.25 : 1,
+                  opacity: safeSelectedIndex === 0 ? 0.25 : 1,
                 }}
                 activeOpacity={0.7}
               >
@@ -923,7 +1047,7 @@ export default function MapTabScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleNext}
-                disabled={selectedStopIndex === stops.length - 1}
+                disabled={safeSelectedIndex === groups.length - 1}
                 style={{
                   width: 40,
                   height: 40,
@@ -931,7 +1055,7 @@ export default function MapTabScreen() {
                   alignItems: "center",
                   justifyContent: "center",
                   backgroundColor: "rgba(255,255,255,0.04)",
-                  opacity: selectedStopIndex === stops.length - 1 ? 0.25 : 1,
+                  opacity: safeSelectedIndex === groups.length - 1 ? 0.25 : 1,
                 }}
                 activeOpacity={0.7}
               >
@@ -943,6 +1067,8 @@ export default function MapTabScreen() {
       </View>
     );
   };
+
+  const legLabel = viewedRoute ? getRouteLegLabel(viewedRoute) : null;
 
   return (
     <View style={{ paddingTop: insets.top }} className="flex-1 bg-black">
@@ -978,46 +1104,25 @@ export default function MapTabScreen() {
           </>
         )}
 
-        {/* Draw Custom Markers */}
-        {stops.map((stop, index) => {
-          const lat = stop.location?.lat || stop.job?.location?.lat;
-          const lng = stop.location?.lng || stop.job?.location?.lng;
-          if (lat == null || lng == null) return null;
+        {/* Draw Custom Markers (1 per physical visit group) */}
+        {groups.map((group, index) => {
+          const coords = getStopCoords(group.representative);
+          if (!coords) return null;
 
-          const isDepot =
-            stop.stop_type?.toLowerCase().includes("depot") || !stop.job;
-          const isSelected = selectedStopIndex === index;
-          const mStyle = getMarkerStyle(stop, index);
-
-          // Anchor bottom-tip of teardrop pin exactly on coordinate
-          const pinW = mStyle.size;
-          const pinH = Math.round(pinW * (42 / 32));
+          const isSelected = safeSelectedIndex === index;
+          const mStyle = getMarkerStyle(group, index);
 
           return (
-            // <Marker
-            //   key={stop.id}
-            //   coordinate={{ latitude: lat, longitude: lng }}
-            //   onPress={() => zoomToStop(stop, index)}
-            //   // anchor x=0.5 centres horizontally; y=1 places bottom of view on coord
-            //   anchor={{ x: 0.5, y: 1 }}
-            //   tracksViewChanges={tracksChanges}
-            // >
-            //   <PureMarkerPin
-            //     mStyle={mStyle}
-            //     label={stop.sequence_order ?? index + 1}
-            //     isSelected={isSelected}
-            //   />
-            // </Marker>
             <Marker
-              key={stop.id}
-              coordinate={{ latitude: lat, longitude: lng }}
-              onPress={() => zoomToStop(stop, index)}
+              key={group.key}
+              coordinate={coords}
+              onPress={() => zoomToGroup(group, index)}
               anchor={{ x: 0.5, y: 1 }}
               tracksViewChanges={tracksChanges}
             >
               <PureMarkerPin
                 mStyle={mStyle}
-                label={stop.sequence_order ?? index + 1}
+                label={group.displayNumber ?? index + 1}
                 isSelected={isSelected}
               />
             </Marker>
@@ -1025,75 +1130,146 @@ export default function MapTabScreen() {
         })}
       </MapView>
 
-      {/* ─── Route Progress Header ─── */}
-      {assignedRoute && stops.length > 0 && (
+      {/* ─── Route Progress Header (+ multi-leg switcher) ─── */}
+      {viewedRoute && groups.length > 0 && (
         <View
           style={{
             position: "absolute",
             top: insets.top + 8,
             left: 16,
             right: 60,
-            backgroundColor: "rgba(28,28,30,0.85)",
-            borderRadius: 14,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderWidth: 1,
-            borderColor: "rgba(255,255,255,0.08)",
+            gap: 6,
           }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 14,
-                backgroundColor: "rgba(48,209,88,0.15)",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="navigate" size={14} color="#30D158" />
-            </View>
-            <View>
-              <Text
-                style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "700" }}
-              >
-                Active Route
-              </Text>
-              <Text style={{ color: "#8E8E93", fontSize: 10 }}>
-                {completedCount}/{jobStops.length} jobs ({stops.length} stops)
-              </Text>
-            </View>
-          </View>
-          {/* Mini progress bar */}
           <View
             style={{
-              width: 48,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: "rgba(255,255,255,0.08)",
+              backgroundColor: "rgba(28,28,30,0.88)",
+              borderRadius: 14,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.08)",
             }}
           >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, marginRight: 8 }}>
+              <View
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  backgroundColor: "rgba(48,209,88,0.15)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="navigate" size={14} color="#30D158" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text
+                    style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "700", flexShrink: 1 }}
+                    numberOfLines={1}
+                  >
+                    {viewedRoute.name || `Route #${viewedRoute.route_id}`}
+                  </Text>
+                  {legLabel && (
+                    <View
+                      style={{
+                        backgroundColor:
+                          legLabel === "GO"
+                            ? "rgba(48,209,88,0.18)"
+                            : "rgba(10,132,255,0.22)",
+                        paddingHorizontal: 6,
+                        paddingVertical: 1,
+                        borderRadius: 5,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 9,
+                          fontWeight: "700",
+                          color: legLabel === "GO" ? "#30D158" : "#0A84FF",
+                        }}
+                      >
+                        {legLabel}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={{ color: "#8E8E93", fontSize: 10 }}>
+                  {completedCount}/{jobStops.length} {isShuttle ? "actions" : "jobs"} ({visitGroups.length} stops)
+                </Text>
+              </View>
+            </View>
+            {/* Mini progress bar */}
             <View
               style={{
-                width:
-                  jobStops.length > 0
-                    ? (completedCount / jobStops.length) * 48
-                    : 0,
+                width: 48,
                 height: 4,
                 borderRadius: 2,
-                backgroundColor: "#30D158",
+                backgroundColor: "rgba(255,255,255,0.08)",
               }}
-            />
+            >
+              <View
+                style={{
+                  width:
+                    jobStops.length > 0
+                      ? (completedCount / jobStops.length) * 48
+                      : 0,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: "#30D158",
+                }}
+              />
+            </View>
           </View>
+
+          {openRoutes.length > 1 && (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {openRoutes.map((r) => {
+                const active = r.route_id === viewedRoute.route_id;
+                const rLeg = getRouteLegLabel(r);
+                const chipLabel = rLeg ?? r.name ?? `#${r.route_id}`;
+                return (
+                  <TouchableOpacity
+                    key={r.route_id}
+                    onPress={() => selectRoute(r.route_id)}
+                    activeOpacity={0.75}
+                    style={{
+                      backgroundColor: active
+                        ? "#30D158"
+                        : "rgba(28,28,30,0.88)",
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: active
+                        ? "#30D158"
+                        : "rgba(255,255,255,0.1)",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "700",
+                        color: active ? "#000000" : "#FFFFFF",
+                      }}
+                    >
+                      {chipLabel}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </View>
       )}
 
       {/* ─── Floating Controls ─── */}
-      {stopsWithCoords.length > 0 && (
+      {groupsWithCoords.length > 0 && (
         <View
           style={{
             position: "absolute",
@@ -1104,10 +1280,9 @@ export default function MapTabScreen() {
         >
           <TouchableOpacity
             onPress={() => {
-              const coords = stopsWithCoords.map((stop) => ({
-                latitude: stop.location?.lat || stop.job!.location!.lat,
-                longitude: stop.location?.lng || stop.job!.location!.lng,
-              }));
+              const coords = groupsWithCoords.map(
+                (g) => getStopCoords(g.representative)!,
+              );
               mapRef.current?.fitToCoordinates(coords, {
                 edgePadding: { top: 80, right: 50, bottom: 240, left: 50 },
                 animated: true,
@@ -1131,7 +1306,7 @@ export default function MapTabScreen() {
       )}
 
       {/* Swipeable Horizontal Stop Carousel Cards list */}
-      {stops.length > 0 ? (
+      {groups.length > 0 ? (
         <View
           style={{
             position: "absolute",
@@ -1143,22 +1318,22 @@ export default function MapTabScreen() {
         >
           <FlatList
             ref={flatListRef}
-            data={stops}
-            renderItem={renderStopSlide}
-            keyExtractor={(item) => String(item.id)}
+            data={groups}
+            renderItem={renderGroupSlide}
+            keyExtractor={(item) => item.key}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             onScroll={handleScroll}
             scrollEventThrottle={16}
-            getItemLayout={(data, index) => ({
+            getItemLayout={(_, index) => ({
               length: width,
               offset: width * index,
               index,
             })}
           />
           {/* Pagination Dots */}
-          {stops.length > 1 && (
+          {groups.length > 1 && (
             <View
               style={{
                 flexDirection: "row",
@@ -1168,20 +1343,21 @@ export default function MapTabScreen() {
                 gap: 5,
               }}
             >
-              {stops.map((_, i) => {
-                const isActive = i === selectedStopIndex;
-                const stopStatus = getStopStatus(stops[i]);
+              {groups.map((g, i) => {
+                const isActive = i === safeSelectedIndex;
                 const dotColor = isActive
                   ? "#30D158"
-                  : stopStatus === "completed"
+                  : g.progress === "completed"
                     ? "#30D158"
-                    : stopStatus === "failed"
+                    : g.progress === "failed"
                       ? "#FF453A"
-                      : "rgba(255,255,255,0.15)";
+                      : g.progress === "partial"
+                        ? "#0A84FF"
+                        : "rgba(255,255,255,0.15)";
                 return (
                   <TouchableOpacity
-                    key={i}
-                    onPress={() => zoomToStop(stops[i], i)}
+                    key={g.key}
+                    onPress={() => zoomToGroup(g, i)}
                     activeOpacity={0.7}
                   >
                     <View

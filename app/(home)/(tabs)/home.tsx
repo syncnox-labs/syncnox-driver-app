@@ -11,10 +11,16 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
-import { useRouteSocket } from '@/hooks/useRouteSocket';
+import { useAuthStore } from '@/store/auth.store';
 import { useRouteStore } from '@/store/route.store';
+import { AssignedRoute } from '@/types/route.types';
 import { formatDistance } from '@/utils/distance.utils';
-import { isStopDone, getStopStatus } from '../_components/homeScreen.utils';
+import {
+  getRouteLegLabel,
+  getStopProgress,
+  groupRouteStops,
+  isStopFinished,
+} from '@/utils/shuttleRoute.utils';
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 const G = '#30D158';
@@ -102,24 +108,57 @@ function MapPinIcon() {
   );
 }
 
+function localIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function firstStopTimestamp(route: AssignedRoute): string {
+  const first = (route.stops ?? []).find((s) => !!s.planned_arrival_time || !!s.planned_departure_time);
+  return first?.planned_arrival_time || first?.planned_departure_time || route.scheduled_date || '';
+}
+
+function formatVehicleChip(vehicle?: AssignedRoute['vehicle'] | null): string | null {
+  if (!vehicle) return null;
+  if (vehicle.vehicle_summary) return vehicle.vehicle_summary;
+  const parts = [vehicle.name];
+  if (vehicle.license_plate) parts.push(vehicle.license_plate);
+  if (vehicle.capacity) parts.push(`${vehicle.capacity} seats`);
+  return parts.filter(Boolean).join(' • ') || null;
+}
+
 // ─── Single Route Card ────────────────────────────────────────────────────────
 function RouteCard({
   route,
   tab,
+  defaultTemplate,
   onPress,
   onStart,
 }: {
-  route: any;
+  route: AssignedRoute;
   tab: RouteTab;
+  defaultTemplate?: AssignedRoute['job_template_type'] | null;
   onPress: () => void;
   onStart: () => void;
 }) {
+  const tpl = route.job_template_type ?? defaultTemplate ?? 'pickup_delivery_job';
+  const isShuttle = tpl === 'worker_shuttle';
   const allStops = route.stops ?? [];
-  const jobStops = allStops.filter((s: any) => !!s.job);
-  const totalJobs = jobStops.length > 0 ? jobStops.length : allStops.length;
-  const completedJobs = (jobStops.length > 0 ? jobStops : allStops).filter((s: any) => isStopDone(s)).length;
-  const totalStops = allStops.length;
-  const pct = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0;
+  const jobStops = allStops.filter((s) => !!s.job);
+  const groups = groupRouteStops(route, tpl);
+  const visitGroups = groups.filter((g) => g.kind !== 'start' && g.kind !== 'end');
+
+  const uniquePassengerIds = new Set(
+    jobStops.map((s) => s.job?.id).filter((id): id is number => id != null),
+  );
+  const passengerCount = uniquePassengerIds.size || jobStops.length;
+
+  const totalActions = jobStops.length > 0 ? jobStops.length : visitGroups.length;
+  const completedActions = (jobStops.length > 0 ? jobStops : allStops).filter(isStopFinished).length;
+  const totalStops = visitGroups.length > 0 ? visitGroups.length : allStops.length;
+  const pct = totalActions > 0 ? (completedActions / totalActions) * 100 : 0;
   const isActive = tab === 'active';
   const isUpcoming = tab === 'upcoming';
   const isInProgress = route.assignment_status === 'in_progress';
@@ -142,10 +181,17 @@ function RouteCard({
     : 'Today';
 
   const routeName = route.name ?? `Route #${route.route_id}`;
+  const legLabel = getRouteLegLabel(route);
+  const vehicleChip = formatVehicleChip(route.vehicle);
 
-  const jobsLabel = isUpcoming ? `${totalJobs}` : `${completedJobs}/${totalJobs}`;
+  const primaryStatLabel = isShuttle ? 'Passengers' : 'Jobs';
+  const primaryStatValue = isShuttle
+    ? `${passengerCount}`
+    : isUpcoming
+      ? `${totalActions}`
+      : `${completedActions}/${totalActions}`;
 
-  const pillStatus = isInProgress ? 'in_progress' : tab === 'done' ? 'completed' : tab;
+  const pillStatus = isInProgress ? 'in_progress' : tab === 'done' ? 'completed' : route.assignment_status === 'acknowledged' && isUpcoming ? 'upcoming' : tab;
 
   return (
     <View style={{ backgroundColor: CARD, borderRadius: 16, marginBottom: 10, overflow: 'hidden' }}>
@@ -160,6 +206,53 @@ function RouteCard({
             <ChevronRight />
           </View>
         </View>
+
+        {/* Shuttle leg / Team Leader / Vehicle badges */}
+        {(legLabel || route.is_team_leader || vehicleChip) && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            {legLabel && (
+              <View
+                style={{
+                  backgroundColor: legLabel === 'GO' ? 'rgba(48,209,88,0.14)' : 'rgba(10,132,255,0.16)',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 6,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: legLabel === 'GO' ? G : BLUE }}>
+                  {legLabel} LEG
+                </Text>
+              </View>
+            )}
+            {route.is_team_leader && (
+              <View
+                style={{
+                  backgroundColor: 'rgba(255,159,10,0.14)',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 6,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: AMBER }}>Team Leader</Text>
+              </View>
+            )}
+            {vehicleChip && (
+              <View
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 6,
+                  maxWidth: '100%',
+                }}
+              >
+                <Text style={{ fontSize: 11, color: '#D1D1D6' }} numberOfLines={1}>
+                  🚐 {vehicleChip}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Date + time */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -178,7 +271,7 @@ function RouteCard({
         {/* Stats row */}
         <View style={{ flexDirection: 'row', gap: 18, marginBottom: !isUpcoming ? 12 : 0 }}>
           {[
-            { label: 'Jobs', value: jobsLabel },
+            { label: primaryStatLabel, value: primaryStatValue },
             { label: 'Stops', value: `${totalStops}` },
             { label: 'Distance', value: distanceMi },
             { label: 'Est.', value: durationLabel },
@@ -238,7 +331,7 @@ function RouteCard({
       )}
 
       {/* Upcoming: address strip */}
-      {isUpcoming && route.stops && route.stops.length > 0 && (
+      {isUpcoming && groups.length > 0 && (
         <View
           style={{
             borderTopWidth: 1,
@@ -251,8 +344,8 @@ function RouteCard({
           }}
         >
           <MapPinIcon />
-          <Text style={{ fontSize: 12, color: LABEL }} numberOfLines={1}>
-            {route.stops[0]?.address_formatted ?? 'Route details pending'}
+          <Text style={{ fontSize: 12, color: LABEL, flex: 1 }} numberOfLines={1}>
+            {(visitGroups[0] ?? groups[0])?.representative?.address_formatted ?? 'Route details pending'}
           </Text>
         </View>
       )}
@@ -278,59 +371,93 @@ function EmptyTab({ tab }: { tab: RouteTab }) {
 
 // ─── Main Routes Screen ───────────────────────────────────────────────────────
 export default function RoutesScreen() {
-  const { assignedRoute, allRoutes, distanceUnit, isLoading, fetchMyRoutes } = useRouteStore();
+  const { assignedRoute, allRoutes, distanceUnit, isLoading, fetchMyRoutes, selectRoute } = useRouteStore();
+  const authTemplate = useAuthStore((s) => s.jobTemplate);
   const [tab, setTab] = useState<RouteTab>('active');
-
-  useRouteSocket();
 
   useEffect(() => {
     fetchMyRoutes();
   }, []);
 
-  // Summary pills are based on the active route (non-completed)
-  const activeRoute = assignedRoute ?? null;
-  const allStops = activeRoute?.stops ?? [];
-  const allJobStops = allStops.filter((s) => !!s.job);
-  const completedStops = allJobStops.filter(isStopDone);
-  const pendingStops = allJobStops.filter((s) => !isStopDone(s));
-
-  // Driver score (simple version based on completion)
-  const totalStops = allJobStops.length;
-  const completedCount = completedStops.filter((s) => getStopStatus(s) === 'completed').length;
-  const driverScore = totalStops > 0 ? Math.round((completedCount / totalStops) * 100) : 0;
-
-  // Distance and duration formatting
-  const distanceM = activeRoute?.total_distance_meters ?? 0;
-  const distanceMi = formatDistance(distanceM, distanceUnit);
-  const durSec = activeRoute?.total_duration_seconds ?? 0;
-  const durH = Math.floor(durSec / 3600);
-  const durMin = Math.floor((durSec % 3600) / 60);
-  const durationLabel = durSec > 0 ? `${durH}h ${durMin}m` : '—';
-
   // Current date label
   const today = new Date();
+  const todayIso = localIsoDate(today);
   const dateLabel = today.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+  const sortChronological = (routes: AssignedRoute[]) =>
+    [...routes].sort((a, b) => {
+      const ta = firstStopTimestamp(a);
+      const tb = firstStopTimestamp(b);
+      if (ta !== tb) return ta.localeCompare(tb);
+      if (a.leg === 'GO' && b.leg === 'RETURN') return -1;
+      if (a.leg === 'RETURN' && b.leg === 'GO') return 1;
+      return a.route_id - b.route_id;
+    });
 
   // Split routes from allRoutes into active, upcoming, and done tabs
   const nonCompleted = allRoutes.filter((r) => r.assignment_status !== 'completed');
+  const todayOpen = sortChronological(
+    nonCompleted.filter(
+      (r) =>
+        r.assignment_status === 'in_progress' ||
+        (r.scheduled_date && r.scheduled_date.slice(0, 10) === todayIso),
+    ),
+  );
 
-  // Active route: in_progress > acknowledged > oldest pending (FIFO)
   const currentActive =
     nonCompleted.find((r) => r.assignment_status === 'in_progress') ??
     nonCompleted.find((r) => r.assignment_status === 'acknowledged') ??
     nonCompleted.find((r) => r.assignment_status === 'pending') ??
     null;
 
-  const activeRoutes = currentActive ? [currentActive] : [];
-  const upcomingRoutes = nonCompleted.filter((r) => r.route_id !== currentActive?.route_id);
+  // Show all of today's open legs (e.g. GO + RETURN) under Active; fall back to currentActive if none are dated today
+  const activeRoutes = todayOpen.length > 0 ? todayOpen : currentActive ? [currentActive] : [];
+  const activeIdSet = new Set(activeRoutes.map((r) => r.route_id));
+  const upcomingRoutes = sortChronological(nonCompleted.filter((r) => !activeIdSet.has(r.route_id)));
   const doneRoutes = allRoutes.filter((r) => r.assignment_status === 'completed');
 
-  const tabRoutes: Record<RouteTab, any[]> = {
+  // Daily summary pills aggregate across all of today's routes (including completed morning legs)
+  const todayAllRoutes = allRoutes.filter(
+    (r) => r.scheduled_date && r.scheduled_date.slice(0, 10) === todayIso,
+  );
+  const summaryRoutes =
+    todayAllRoutes.length > 0 ? todayAllRoutes : assignedRoute ? [assignedRoute] : [];
+
+  const summaryJobStops = summaryRoutes.flatMap((r) => (r.stops ?? []).filter((s) => !!s.job));
+  const summaryVisits = summaryRoutes.flatMap((r) =>
+    groupRouteStops(r, r.job_template_type ?? authTemplate).filter(
+      (g) => g.kind !== 'start' && g.kind !== 'end',
+    ),
+  );
+  const totalJobCount = summaryJobStops.length;
+  const completedJobCount = summaryJobStops.filter(
+    (s) => getStopProgress(s) === 'completed',
+  ).length;
+  const driverScore =
+    totalJobCount > 0 ? Math.round((completedJobCount / totalJobCount) * 100) : 0;
+
+  const totalStops = summaryVisits.length;
+  const completedCount = summaryVisits.filter(
+    (g) => g.progress === 'completed' || g.progress === 'skipped',
+  ).length;
+
+  const distanceM = summaryRoutes.reduce((acc, r) => acc + (r.total_distance_meters ?? 0), 0);
+  const distanceMi = formatDistance(distanceM, distanceUnit);
+
+  const tabRoutes: Record<RouteTab, AssignedRoute[]> = {
     active: activeRoutes,
     upcoming: upcomingRoutes,
     done: doneRoutes,
   };
   const displayed = tabRoutes[tab];
+
+  const openRouteDetail = (route: AssignedRoute) => {
+    selectRoute(route.route_id);
+    router.push({
+      pathname: '/(home)/route-detail' as any,
+      params: { routeId: String(route.route_id) },
+    });
+  };
 
   const TAB_CFG: { key: RouteTab; label: string }[] = [
     { key: 'active', label: 'Active' },
@@ -444,23 +571,14 @@ export default function RoutesScreen() {
             {displayed.length === 0 ? (
               <EmptyTab tab={tab} />
             ) : (
-              displayed.map((route, idx) => (
+              displayed.map((route) => (
                 <RouteCard
-                  key={idx}
+                  key={route.route_id}
                   route={route}
                   tab={tab}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/(home)/route-detail' as any,
-                      params: { routeId: route.route_id },
-                    })
-                  }
-                  onStart={() =>
-                    router.push({
-                      pathname: '/(home)/route-detail' as any,
-                      params: { routeId: route.route_id },
-                    })
-                  }
+                  defaultTemplate={authTemplate}
+                  onPress={() => openRouteDetail(route)}
+                  onStart={() => openRouteDetail(route)}
                 />
               ))
             )}

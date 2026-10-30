@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
+import { useAuthStore } from '@/store/auth.store';
 import { useRouteStore } from '@/store/route.store';
-import { getStopStatus, isStopDone, formatTime } from '../_components/homeScreen.utils';
+import { AssignedRoute, JobTemplateType, RouteStop, StopProgress } from '@/types/route.types';
+import {
+  getDoneLabel,
+  getFailLabel,
+  getRouteLegLabel,
+  getStopKind,
+  getStopPassenger,
+  getStopProgress,
+  isStopFinished,
+  StopKind,
+} from '@/utils/shuttleRoute.utils';
+import { formatTime } from '../_components/homeScreen.utils';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const G = '#30D158';
@@ -19,6 +31,14 @@ const LABEL = '#8E8E93';
 const SEP = 'rgba(255,255,255,0.08)';
 const AMBER = '#FF9F0A';
 const RED = '#FF453A';
+const BLUE = '#0A84FF';
+
+function localIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 function ChevronRight() {
   return (
@@ -28,38 +48,68 @@ function ChevronRight() {
   );
 }
 
-function statusColor(status: string): string {
+function statusColor(status: StopProgress): string {
   if (status === 'completed') return G;
   if (status === 'failed') return RED;
-  if (status === 'pending') return AMBER;
-  return LABEL;
+  if (status === 'skipped') return LABEL;
+  return AMBER;
 }
 
-function statusLabel(status: string): string {
-  if (status === 'completed') return 'Delivered';
-  if (status === 'failed') return 'Failed';
-  if (status === 'pending') return 'Pending';
-  return 'Unknown';
+function statusLabel(status: StopProgress, kind: StopKind, template?: JobTemplateType | null): string {
+  if (status === 'completed') return getDoneLabel(kind, template);
+  if (status === 'failed') return getFailLabel(kind, template);
+  if (status === 'skipped') return 'Skipped';
+  return 'Pending';
+}
+
+interface TimelineItem {
+  route: AssignedRoute;
+  stop: RouteStop;
 }
 
 export default function TimelineScreen() {
-  const { assignedRoute } = useRouteStore();
+  const { assignedRoute, allRoutes, fetchMyRoutes, selectRoute } = useRouteStore();
+  const authTemplate = useAuthStore((s) => s.jobTemplate);
 
-  const allStops = assignedRoute?.stops ?? [];
-  const doneStops = allStops
-    .filter(isStopDone)
+  useEffect(() => {
+    if (allRoutes.length === 0) {
+      fetchMyRoutes();
+    }
+  }, []);
+
+  const today = new Date();
+  const todayIso = localIsoDate(today);
+  const dateLabel = today.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+  const todayRoutes = allRoutes.filter(
+    (r) => r.scheduled_date && r.scheduled_date.slice(0, 10) === todayIso,
+  );
+  const sourceRoutes =
+    todayRoutes.length > 0
+      ? todayRoutes
+      : assignedRoute
+        ? [assignedRoute]
+        : allRoutes.slice(0, 1);
+
+  const isShuttle =
+    sourceRoutes.some((r) => r.job_template_type === 'worker_shuttle') ||
+    authTemplate === 'worker_shuttle';
+
+  const allItems: TimelineItem[] = sourceRoutes.flatMap((route) =>
+    (route.stops ?? []).filter((s) => !!s.job).map((stop) => ({ route, stop })),
+  );
+
+  const doneItems = allItems
+    .filter(({ stop }) => isStopFinished(stop))
     .sort((a, b) => {
-      const aTime = a.actual_departure_time || a.actual_arrival_time || '';
-      const bTime = b.actual_departure_time || b.actual_arrival_time || '';
+      const aTime = a.stop.actual_departure_time || a.stop.actual_arrival_time || a.stop.job?.completed_at || '';
+      const bTime = b.stop.actual_departure_time || b.stop.actual_arrival_time || b.stop.job?.completed_at || '';
       return bTime.localeCompare(aTime);
     });
 
-  const totalStops = allStops.length;
-  const completedCount = doneStops.filter((s) => getStopStatus(s) === 'completed').length;
-  const failedCount = doneStops.filter((s) => getStopStatus(s) === 'failed').length;
-
-  const today = new Date();
-  const dateLabel = today.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const totalStops = allItems.length;
+  const completedCount = doneItems.filter(({ stop }) => getStopProgress(stop) === 'completed').length;
+  const failedCount = doneItems.filter(({ stop }) => getStopProgress(stop) === 'failed').length;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
@@ -74,12 +124,12 @@ export default function TimelineScreen() {
         </View>
 
         {/* ── Summary row ── */}
-        {doneStops.length > 0 && (
+        {doneItems.length > 0 && (
           <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 20, marginBottom: 16 }}>
             {[
               { label: 'Completed', value: `${completedCount}`, color: G },
-              { label: 'Failed', value: `${failedCount}`, color: failedCount > 0 ? RED : LABEL },
-              { label: 'Remaining', value: `${totalStops - doneStops.length}`, color: '#fff' },
+              { label: isShuttle ? 'No-shows' : 'Failed', value: `${failedCount}`, color: failedCount > 0 ? RED : LABEL },
+              { label: 'Remaining', value: `${Math.max(0, totalStops - doneItems.length)}`, color: '#fff' },
             ].map((s) => (
               <View key={s.label} style={{ flex: 1, backgroundColor: CARD, borderRadius: 14, padding: 12 }}>
                 <Text style={{ fontSize: 10, color: LABEL, marginBottom: 4 }}>{s.label}</Text>
@@ -97,41 +147,54 @@ export default function TimelineScreen() {
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
           showsVerticalScrollIndicator={false}
         >
-          {doneStops.length === 0 ? (
+          {doneItems.length === 0 ? (
             <View style={{ alignItems: 'center', paddingTop: 60 }}>
-              <Text style={{ fontSize: 17, color: LABEL, marginBottom: 6 }}>No deliveries yet</Text>
+              <Text style={{ fontSize: 17, color: LABEL, marginBottom: 6 }}>
+                {isShuttle ? 'No activity yet' : 'No deliveries yet'}
+              </Text>
               <Text style={{ fontSize: 13, color: '#3A3A3C', textAlign: 'center' }}>
-                Completed stops will appear here as you progress through your route.
+                {isShuttle
+                  ? 'Passenger boardings and drop-offs will appear here as you progress through your trips.'
+                  : 'Completed stops will appear here as you progress through your route.'}
               </Text>
             </View>
           ) : (
             <View style={{ backgroundColor: CARD, borderRadius: 16, overflow: 'hidden' }}>
-              {doneStops.map((stop, i) => {
-                const status = getStopStatus(stop);
+              {doneItems.map(({ route, stop }, i) => {
+                const tpl = route.job_template_type ?? authTemplate ?? 'pickup_delivery_job';
+                const kind = getStopKind(stop, tpl);
+                const status = getStopProgress(stop);
                 const sColor = statusColor(status);
-                const sLabel = statusLabel(status);
-                const isLast = i === doneStops.length - 1;
+                const sLabel = statusLabel(status, kind, tpl);
+                const isLast = i === doneItems.length - 1;
+                const legLabel = getRouteLegLabel(route);
 
                 const name =
-                  [stop.job?.first_name, stop.job?.last_name].filter(Boolean).join(' ') ||
-                  stop.job?.business_name ||
-                  `Stop #${stop.sequence_order ?? i + 1}`;
+                  tpl === 'worker_shuttle'
+                    ? getStopPassenger(stop).name
+                    : [stop.job?.first_name, stop.job?.last_name].filter(Boolean).join(' ') ||
+                      stop.job?.business_name ||
+                      `Stop #${stop.sequence_order ?? i + 1}`;
 
                 const address = stop.address_formatted || stop.job?.address_formatted || '';
-                const completedTime = stop.job?.completed_at || stop.actual_departure_time;
+                const completedTime = stop.actual_departure_time || stop.job?.completed_at;
                 const timeStr = completedTime
                   ? formatTime(completedTime)
                   : stop.actual_arrival_time
-                  ? formatTime(stop.actual_arrival_time)
-                  : '';
+                    ? formatTime(stop.actual_arrival_time)
+                    : '';
 
                 return (
                   <TouchableOpacity
-                    key={stop.id}
+                    key={`${route.route_id}-${stop.id}`}
                     activeOpacity={0.7}
-                    onPress={() =>
-                      router.push({ pathname: '/(home)/stop-detail', params: { stopId: stop.id } })
-                    }
+                    onPress={() => {
+                      selectRoute(route.route_id);
+                      router.push({
+                        pathname: '/(home)/stop-detail',
+                        params: { stopId: String(stop.id), routeId: String(route.route_id) },
+                      });
+                    }}
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -155,12 +218,28 @@ export default function TimelineScreen() {
 
                     {/* Content */}
                     <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text
-                        style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}
-                        numberOfLines={1}
-                      >
-                        {name}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text
+                          style={{ fontSize: 15, fontWeight: '600', color: '#fff', flexShrink: 1 }}
+                          numberOfLines={1}
+                        >
+                          {name}
+                        </Text>
+                        {legLabel && (
+                          <View
+                            style={{
+                              backgroundColor: legLabel === 'GO' ? 'rgba(48,209,88,0.14)' : 'rgba(10,132,255,0.16)',
+                              paddingHorizontal: 6,
+                              paddingVertical: 1,
+                              borderRadius: 4,
+                            }}
+                          >
+                            <Text style={{ fontSize: 9, fontWeight: '700', color: legLabel === 'GO' ? G : BLUE }}>
+                              {legLabel}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
                         {timeStr ? (
                           <Text style={{ fontSize: 13, color: LABEL }}>
@@ -168,7 +247,7 @@ export default function TimelineScreen() {
                           </Text>
                         ) : null}
                         {address ? (
-                          <Text style={{ fontSize: 13, color: '#3A3A3C' }} numberOfLines={1}>
+                          <Text style={{ fontSize: 13, color: '#3A3A3C', flex: 1 }} numberOfLines={1}>
                             · {address}
                           </Text>
                         ) : null}
@@ -195,19 +274,19 @@ export default function TimelineScreen() {
           )}
 
           {/* Summary footer */}
-          {doneStops.length > 0 && (
+          {doneItems.length > 0 && (
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, paddingHorizontal: 4 }}>
               <Text style={{ fontSize: 13, color: LABEL }}>
-                {doneStops.length} stops · {completedCount} delivered
+                {doneItems.length} {isShuttle ? 'actions' : 'stops'} · {completedCount} {isShuttle ? 'completed' : 'delivered'}
               </Text>
               <Text
                 style={{
                   fontSize: 13,
                   fontWeight: '600',
-                  color: completedCount === totalStops ? G : completedCount > 0 ? AMBER : LABEL,
+                  color: doneItems.length === totalStops ? G : completedCount > 0 ? AMBER : LABEL,
                 }}
               >
-                {totalStops > 0 ? `${Math.round((completedCount / totalStops) * 100)}% complete` : ''}
+                {totalStops > 0 ? `${Math.round((doneItems.length / totalStops) * 100)}% complete` : ''}
               </Text>
             </View>
           )}
