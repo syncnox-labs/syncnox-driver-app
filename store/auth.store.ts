@@ -2,17 +2,21 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { apiClient } from '@/config/apiClient';
 import { router } from 'expo-router';
+import { JobTemplateType } from '@/types/route.types';
 
 const ACTIVATION_CODE_KEY = 'syncnox_activation_code';
 const DRIVER_NAME_KEY = 'syncnox_driver_name';
 const DRIVER_ID_KEY = 'syncnox_driver_id';
+const JOB_TEMPLATE_KEY = 'syncnox_job_template';
 
 interface AuthState {
   code: string;
   activationCode: string | null;
   driverName: string | null;
   driverId: number | null;  // ← the driver's actual numeric DB ID
+  jobTemplate: JobTemplateType | null;  // tenant's active job template
   isLoading: boolean;
+  setJobTemplate: (template: JobTemplateType) => void;
   setCode: (code: string) => void;
   checkStoredCode: () => Promise<void>;
   login: () => Promise<{ success: boolean; error?: string }>;
@@ -24,7 +28,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   activationCode: null,
   driverName: null,
   driverId: null,
+  jobTemplate: null,
   isLoading: true,
+
+  setJobTemplate: (template) => {
+    if (get().jobTemplate === template) return;
+    set({ jobTemplate: template });
+    SecureStore.setItemAsync(JOB_TEMPLATE_KEY, template).catch(() => {});
+  },
 
   setCode: (code) => set({ code }),
 
@@ -33,11 +44,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const storedCode = await SecureStore.getItemAsync(ACTIVATION_CODE_KEY);
       const storedName = await SecureStore.getItemAsync(DRIVER_NAME_KEY);
       const storedIdStr = await SecureStore.getItemAsync(DRIVER_ID_KEY);
+      const storedTemplate = await SecureStore.getItemAsync(JOB_TEMPLATE_KEY);
       const storedId = storedIdStr ? parseInt(storedIdStr, 10) : null;
       set({
         activationCode: storedCode,
         driverName: storedName,
         driverId: storedId,
+        jobTemplate: storedTemplate === 'worker_shuttle' || storedTemplate === 'pickup_delivery_job' ? storedTemplate : null,
         isLoading: false,
       });
     } catch (e) {
@@ -61,8 +74,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // 3. Persist driver name and ID
       await SecureStore.setItemAsync(DRIVER_NAME_KEY, name);
       await SecureStore.setItemAsync(DRIVER_ID_KEY, String(id));
+      const template: JobTemplateType =
+        driverData.active_job_template === 'worker_shuttle' ? 'worker_shuttle' : 'pickup_delivery_job';
+      await SecureStore.setItemAsync(JOB_TEMPLATE_KEY, template);
 
-      set({ activationCode: code, driverName: name, driverId: id });
+      set({ activationCode: code, driverName: name, driverId: id, jobTemplate: template });
       return { success: true };
     } catch (e: any) {
       // Clean up stored code on failure
@@ -92,7 +108,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.warn("SecureStore failed to delete driver id:", e);
     }
 
-    set({ activationCode: null, driverName: null, driverId: null });
+    try {
+      await SecureStore.deleteItemAsync(JOB_TEMPLATE_KEY);
+    } catch (e) {
+      console.warn("SecureStore failed to delete job template:", e);
+    }
+
+    set({ activationCode: null, driverName: null, driverId: null, jobTemplate: null });
     router.replace('/');
   },
 }));

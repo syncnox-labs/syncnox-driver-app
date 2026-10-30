@@ -1,26 +1,132 @@
 import { create } from 'zustand';
 import { apiClient } from '@/config/apiClient';
-import { AssignedRoute, RouteStop } from '@/types/route.types';
+import { useAuthStore } from '@/store/auth.store';
+import {
+  AssignedRoute,
+  JobTemplateType,
+  NoShowScope,
+  RouteStop,
+  StopProgress,
+} from '@/types/route.types';
 import { DistanceUnit } from '@/utils/distance.utils';
+import { isStopFinished } from '@/utils/shuttleRoute.utils';
+
+export type StopStatusInput = 'completed' | 'failed' | 'pending';
+
+export interface StopUpdateInput {
+  stopId: number;
+  status: StopStatusInput;
+  /** Shuttle no-show only: skip just this leg's dropoff, or the whole job (all legs). */
+  noShowScope?: NoShowScope;
+}
+
+interface ServerStopResult {
+  stop_id: number;
+  status: StopProgress | null;
+  job_id: number | null;
+  job_status: string | null;
+}
+
+interface StopUpdateResponse {
+  progress_percentage?: number;
+  assignment_status?: string | null;
+  stops?: ServerStopResult[];
+}
 
 interface RouteState {
-  assignedRoute: AssignedRoute | null;  // active route for the map tab
-  allRoutes: AssignedRoute[];           // all routes (active + completed) for home tab
+  assignedRoute: AssignedRoute | null;  // active route (in_progress > acknowledged > pending)
+  allRoutes: AssignedRoute[];           // every route (active + completed)
+  selectedRouteId: number | null;       // route the driver is viewing; null = follow active route
   distanceUnit: DistanceUnit;           // 'miles' | 'km'
   isLoading: boolean;
   error: string | null;
 
   fetchMyRoute: () => Promise<void>;
-  fetchMyRoutes: () => Promise<void>;
-  acknowledgeRoute: () => Promise<void>;
-  updateStopStatus: (stopId: number, status: 'completed' | 'failed') => Promise<void>;
+  fetchMyRoutes: (options?: { silent?: boolean }) => Promise<void>;
+  selectRoute: (routeId: number | null) => void;
+  acknowledgeRoute: (routeId?: number) => Promise<void>;
+  startRoute: (routeId: number) => Promise<void>;
+  updateStopStatus: (
+    stopId: number,
+    status: StopStatusInput,
+    options?: { routeId?: number; noShowScope?: NoShowScope },
+  ) => Promise<void>;
+  updateBatchStopStatus: (routeId: number, updates: StopUpdateInput[]) => Promise<void>;
   setDistanceUnit: (unit: DistanceUnit) => Promise<void>;
   clearRoute: () => void;
+}
+
+/** The route the driver is currently looking at: explicit selection, else the active route. */
+export function selectViewedRoute(state: Pick<RouteState, 'allRoutes' | 'assignedRoute' | 'selectedRouteId'>): AssignedRoute | null {
+  if (state.selectedRouteId != null) {
+    const found = state.allRoutes.find((r) => r.route_id === state.selectedRouteId);
+    if (found) return found;
+  }
+  return state.assignedRoute;
+}
+
+export function findStopInRoutes(
+  routes: AssignedRoute[],
+  stopId: number,
+  routeId?: number | null,
+): { route: AssignedRoute; stop: RouteStop } | null {
+  const candidates = routeId != null ? routes.filter((r) => r.route_id === routeId) : routes;
+  for (const route of candidates) {
+    const stop = route.stops.find((s) => s.id === stopId);
+    if (stop) return { route, stop };
+  }
+  return null;
+}
+
+function pickActive(routes: AssignedRoute[]): AssignedRoute | null {
+  const open = routes.filter((r) => r.assignment_status !== 'completed');
+  return (
+    open.find((r) => r.assignment_status === 'in_progress') ??
+    open.find((r) => r.assignment_status === 'acknowledged') ??
+    open.find((r) => r.assignment_status === 'pending') ??
+    null
+  );
+}
+
+/** Mirror the server's per-stop result onto local state (server is the source of truth). */
+function applyStopResult(
+  routes: AssignedRoute[],
+  routeId: number,
+  result: StopUpdateResponse,
+): AssignedRoute[] {
+  const byStop = new Map((result.stops ?? []).map((s) => [s.stop_id, s]));
+  const jobStatus = new Map(
+    (result.stops ?? []).filter((s) => s.job_id != null).map((s) => [s.job_id as number, s.job_status]),
+  );
+  const nowIso = new Date().toISOString();
+  return routes.map((route) => {
+    if (route.route_id !== routeId) return route;
+    const stops = route.stops.map((stop) => {
+      const server = byStop.get(stop.id);
+      const status = server?.status ?? stop.status;
+      const jobId = stop.job?.id;
+      const newJobStatus = jobId != null && jobStatus.has(jobId) ? jobStatus.get(jobId) : undefined;
+      const finished = status != null && status !== 'pending';
+      return {
+        ...stop,
+        status: status ?? undefined,
+        actual_arrival_time: finished ? stop.actual_arrival_time ?? nowIso : undefined,
+        actual_departure_time: server ? (finished ? stop.actual_departure_time ?? nowIso : undefined) : stop.actual_departure_time,
+        job: stop.job && newJobStatus ? { ...stop.job, status: newJobStatus } : stop.job,
+      };
+    });
+    return {
+      ...route,
+      stops,
+      assignment_status: result.assignment_status ?? route.assignment_status,
+    };
+  });
 }
 
 export const useRouteStore = create<RouteState>((set, get) => ({
   assignedRoute: null,
   allRoutes: [],
+  selectedRouteId: null,
   distanceUnit: 'miles',
   isLoading: false,
   error: null,
@@ -52,124 +158,116 @@ export const useRouteStore = create<RouteState>((set, get) => ({
     }
   },
 
-  fetchMyRoutes: async () => {
-    set({ isLoading: true, error: null });
+  fetchMyRoutes: async (options) => {
+    const showSpinner = !options?.silent || get().allRoutes.length === 0;
+    if (showSpinner) set({ isLoading: true, error: null });
     try {
-      const response = await apiClient.get<{ routes: AssignedRoute[]; distance_unit?: string }>('/driver/my-routes');
+      const response = await apiClient.get<{
+        routes: AssignedRoute[];
+        distance_unit?: string;
+        job_template?: JobTemplateType;
+      }>('/driver/my-routes');
       const routes = response.data.routes ?? [];
       const unitRaw = response.data.distance_unit;
       const unit: DistanceUnit = unitRaw === 'km' || unitRaw === 'kilometers' ? 'km' : 'miles';
+      if (response.data.job_template) {
+        useAuthStore.getState().setJobTemplate(response.data.job_template);
+      }
 
-      // Sanitize routes: if all job stops are completed, mark assignment_status as 'completed'
+      // Sanitize routes: if every job stop is finished, treat the assignment as completed
       const sanitizedRoutes = routes.map((r) => {
         const jobStops = r.stops?.filter((s) => !!s.job) ?? [];
-        const isAllDone =
-          jobStops.length > 0 &&
-          jobStops.every(
-            (s) =>
-              !!s.actual_departure_time ||
-              s.job?.status === 'completed' ||
-              s.job?.status === 'failed',
-          );
+        const isAllDone = jobStops.length > 0 && jobStops.every(isStopFinished);
         if (isAllDone && r.assignment_status !== 'completed') {
           return { ...r, assignment_status: 'completed' };
         }
         return r;
       });
 
-      // Active route selection priority: in_progress > acknowledged > first pending (FIFO)
-      const nonCompleted = sanitizedRoutes.filter(
-        (r) => r.assignment_status !== 'completed',
-      );
-      const active =
-        nonCompleted.find((r) => r.assignment_status === 'in_progress') ??
-        nonCompleted.find((r) => r.assignment_status === 'acknowledged') ??
-        nonCompleted.find((r) => r.assignment_status === 'pending') ??
-        null;
-
-      set({ allRoutes: sanitizedRoutes, assignedRoute: active, distanceUnit: unit, isLoading: false });
+      const selected = get().selectedRouteId;
+      set({
+        allRoutes: sanitizedRoutes,
+        assignedRoute: pickActive(sanitizedRoutes),
+        // Drop a selection that no longer exists (route was re-planned or unassigned).
+        selectedRouteId:
+          selected != null && sanitizedRoutes.some((r) => r.route_id === selected) ? selected : null,
+        distanceUnit: unit,
+        isLoading: false,
+      });
     } catch (e: any) {
       const is404 = e?.response?.status === 404;
       set({
         allRoutes: [],
         assignedRoute: null,
+        selectedRouteId: null,
         isLoading: false,
         error: is404 ? null : 'Failed to load routes',
       });
     }
   },
 
-  acknowledgeRoute: async () => {
+  selectRoute: (routeId) => set({ selectedRouteId: routeId }),
+
+  acknowledgeRoute: async (routeId?: number) => {
     try {
-      const current = get().assignedRoute;
-      if (!current) return;
-      await apiClient.post(`/driver/routes/${current.route_id}/acknowledge`);
-      if (current) {
-        set(state => ({
-          assignedRoute: state.assignedRoute?.route_id === current.route_id ? { ...state.assignedRoute, assignment_status: 'acknowledged' } : state.assignedRoute,
-          allRoutes: state.allRoutes.map(route => route.route_id === current.route_id ? { ...route, assignment_status: 'acknowledged' } : route),
-        }));
-      }
+      const target = routeId ?? get().assignedRoute?.route_id;
+      if (target == null) return;
+      await apiClient.post(`/driver/routes/${target}/acknowledge`);
+      set((state) => ({
+        assignedRoute:
+          state.assignedRoute?.route_id === target
+            ? { ...state.assignedRoute, assignment_status: 'acknowledged' }
+            : state.assignedRoute,
+        allRoutes: state.allRoutes.map((route) =>
+          route.route_id === target ? { ...route, assignment_status: 'acknowledged' } : route,
+        ),
+      }));
     } catch (e) {
       console.warn('Acknowledge failed:', e);
     }
   },
 
-  updateStopStatus: async (stopId: number, status: 'completed' | 'failed') => {
+  /** Starts a route; the server auto-checks-in a team leader riding their own booking. */
+  startRoute: async (routeId: number) => {
+    await apiClient.post(`/driver/routes/${routeId}/start`);
+    // Re-sync: the server may have boarded the team leader.
+    await get().fetchMyRoutes({ silent: true });
+  },
+
+  updateStopStatus: async (stopId, status, options) => {
+    const found = findStopInRoutes(get().allRoutes, stopId, options?.routeId);
+    const routeId = options?.routeId ?? found?.route.route_id;
+    if (routeId == null) throw new Error('Stop not found');
     try {
-      await apiClient.post(`/driver/stops/${stopId}/status`, { status });
-
-      // Optimistic UI update — flip the stop's job status locally
-      const current = get().assignedRoute;
-      if (!current) return;
-
-      const nowIso = new Date().toISOString();
-      const updatedStops: RouteStop[] = current.stops.map((s) => {
-        if (s.id !== stopId) return s;
-        return {
-          ...s,
-          actual_arrival_time: s.actual_arrival_time ?? nowIso,
-          actual_departure_time: nowIso,
-          job: s.job ? { ...s.job, status, completed_at: nowIso } : s.job,
-        };
+      const { data } = await apiClient.post<StopUpdateResponse>(`/driver/stops/${stopId}/status`, {
+        status,
+        no_show_scope: options?.noShowScope ?? 'this_leg',
       });
-
-      const jobStops = updatedStops.filter((s) => !!s.job);
-      const isAllDone =
-        jobStops.length > 0 &&
-        jobStops.every(
-          (s) =>
-            !!s.actual_departure_time ||
-            s.job?.status === 'completed' ||
-            s.job?.status === 'failed',
-        );
-
-      const newAssignmentStatus = isAllDone
-        ? 'completed'
-        : current.assignment_status === 'acknowledged' || current.assignment_status === 'pending'
-        ? 'in_progress'
-        : current.assignment_status;
-
-      const updatedRoute: AssignedRoute = {
-        ...current,
-        stops: updatedStops,
-        assignment_status: newAssignmentStatus,
-      };
-
-      const allRoutes = get().allRoutes.map((r) =>
-        r.route_id === updatedRoute.route_id ? updatedRoute : r,
-      );
-
-      const nonCompleted = allRoutes.filter((r) => r.assignment_status !== 'completed');
-      const nextActive =
-        nonCompleted.find((r) => r.assignment_status === 'in_progress') ??
-        nonCompleted.find((r) => r.assignment_status === 'acknowledged') ??
-        nonCompleted.find((r) => r.assignment_status === 'pending') ??
-        null;
-
-      set({ allRoutes, assignedRoute: nextActive });
+      const allRoutes = applyStopResult(get().allRoutes, routeId, data);
+      set({ allRoutes, assignedRoute: pickActive(allRoutes) });
+      if (get().allRoutes.length > 1 && (options?.noShowScope === 'job' || status === 'pending')) {
+        void get().fetchMyRoutes({ silent: true });
+      }
     } catch (e: any) {
       console.error('updateStopStatus error:', e);
+      throw e;
+    }
+  },
+
+  /** Atomically update several stops of one route (e.g. everyone at a shared pickup). */
+  updateBatchStopStatus: async (routeId, updates) => {
+    try {
+      const { data } = await apiClient.post<StopUpdateResponse>('/driver/stops/batch-status', {
+        updates: updates.map((u) => ({
+          stop_id: u.stopId,
+          status: u.status,
+          no_show_scope: u.noShowScope ?? 'this_leg',
+        })),
+      });
+      const allRoutes = applyStopResult(get().allRoutes, routeId, data);
+      set({ allRoutes, assignedRoute: pickActive(allRoutes) });
+    } catch (e: any) {
+      console.error('updateBatchStopStatus error:', e);
       throw e;
     }
   },
@@ -184,5 +282,5 @@ export const useRouteStore = create<RouteState>((set, get) => ({
     }
   },
 
-  clearRoute: () => set({ assignedRoute: null, allRoutes: [], error: null }),
+  clearRoute: () => set({ assignedRoute: null, allRoutes: [], selectedRouteId: null, error: null }),
 }));

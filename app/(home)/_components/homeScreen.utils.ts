@@ -1,4 +1,5 @@
 import { RouteStop } from '@/types/route.types';
+import { getStopProgress, isStopFinished } from '@/utils/shuttleRoute.utils';
 
 // ─────────────────────────────────────────────────────────────── //
 // Time formatting
@@ -16,6 +17,8 @@ export function formatTime(isoStr?: string): string {
 
 export function getJobTypeLabel(jobType?: string): string {
   switch (jobType?.toLowerCase()) {
+    case 'dropoff':
+    case 'drop_off': return 'Drop-off';
     case 'pickup': return 'Pickup';
     case 'service': return 'Service';
     default: return 'Delivery';
@@ -27,16 +30,18 @@ export function getJobTypeLabel(jobType?: string): string {
 // ─────────────────────────────────────────────────────────────── //
 
 export function isStopDone(stop: RouteStop): boolean {
-  return !!(
-    stop.actual_departure_time ||
-    stop.job?.status === 'completed' ||
-    stop.job?.status === 'failed'
-  );
+  return isStopFinished(stop);
 }
 
+/**
+ * Per-stop status. Shuttle pickup/dropoff stops of one job share a job record, so this
+ * reads the stop's own progress (never only the job status). A skipped stop (its passenger
+ * never boarded) is shown with the failed styling.
+ */
 export function getStopStatus(stop: RouteStop): 'completed' | 'failed' | 'pending' {
-  if (stop.job?.status === 'failed') return 'failed';
-  if (stop.job?.status === 'completed' || stop.actual_departure_time) return 'completed';
+  const progress = getStopProgress(stop);
+  if (progress === 'completed') return 'completed';
+  if (progress === 'failed' || progress === 'skipped') return 'failed';
   return 'pending';
 }
 
