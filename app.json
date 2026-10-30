@@ -45,13 +45,21 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        },
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false
+          }
         }
       ],
       "expo-secure-store",
       "expo-font",
       "expo-image",
       "expo-web-browser",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true,
