@@ -1,13 +1,14 @@
 import "../global.css";
-import { Stack, router, usePathname } from "expo-router";
+import { Stack } from "expo-router";
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/auth.store";
 import { View, StatusBar, LogBox } from "react-native";
 
+import { ActivityIndicator, PaperProvider, MD3DarkTheme } from "react-native-paper";
+
 LogBox.ignoreAllLogs();
-import { ActivityIndicator } from "react-native-paper";
-import { PaperProvider, MD3DarkTheme } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
+
+export const unstable_settings = { initialRouteName: 'index' };
 
 // Syncnox brand theme for React Native Paper
 const syncnoxTheme = {
@@ -27,25 +28,14 @@ const syncnoxTheme = {
 
 /**
  * Root layout — imports global.css (NativeWind), wraps with PaperProvider,
- * checks SecureStore on mount, and redirects authenticated users to Home.
+ * restores the saved session before mounting mutually exclusive guest / signed-in routes.
  */
 export default function RootLayout() {
   const { activationCode, isLoading, checkStoredCode } = useAuthStore();
-  const pathName = usePathname();
 
   useEffect(() => {
     checkStoredCode();
-  }, []);
-
-  useEffect(() => {
-    if (!isLoading) {
-      if (activationCode) {
-        router.replace("/(home)/(tabs)/home");
-      } else {
-        router.replace("/");
-      }
-    }
-  }, [isLoading, activationCode]);
+  }, [checkStoredCode]);
 
   if (isLoading) {
     return (
@@ -59,11 +49,7 @@ export default function RootLayout() {
 
   return (
     <PaperProvider theme={syncnoxTheme}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
+      <StatusBar barStyle="light-content" />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -72,11 +58,13 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ animation: "fade" }} />
-        <Stack.Screen
-          name="login"
-          options={{ animation: "slide_from_right" }}
-        />
-        <Stack.Screen name="(home)" options={{ animation: "fade" }} />
+        <Stack.Protected guard={!activationCode}>
+          <Stack.Screen name="welcome" options={{ animation: "fade" }} />
+          <Stack.Screen name="login" options={{ animation: "slide_from_right" }} />
+        </Stack.Protected>
+        <Stack.Protected guard={!!activationCode}>
+          <Stack.Screen name="(home)" options={{ animation: "fade" }} />
+        </Stack.Protected>
       </Stack>
     </PaperProvider>
   );

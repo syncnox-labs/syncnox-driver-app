@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { apiClient } from '@/config/apiClient';
-import { router } from 'expo-router';
 import { JobTemplateType } from '@/types/route.types';
 
 const ACTIVATION_CODE_KEY = 'syncnox_activation_code';
@@ -42,10 +41,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   checkStoredCode: async () => {
     try {
       const storedCode = await SecureStore.getItemAsync(ACTIVATION_CODE_KEY);
-      const storedName = await SecureStore.getItemAsync(DRIVER_NAME_KEY);
-      const storedIdStr = await SecureStore.getItemAsync(DRIVER_ID_KEY);
-      const storedTemplate = await SecureStore.getItemAsync(JOB_TEMPLATE_KEY);
-      const storedId = storedIdStr ? parseInt(storedIdStr, 10) : null;
+      // Optional profile metadata must not invalidate a securely saved activation code.
+      const [storedName, storedIdStr, storedTemplate] = await Promise.all([
+        SecureStore.getItemAsync(DRIVER_NAME_KEY).catch(() => null),
+        SecureStore.getItemAsync(DRIVER_ID_KEY).catch(() => null),
+        SecureStore.getItemAsync(JOB_TEMPLATE_KEY).catch(() => null),
+      ]);
+      const parsedId = storedIdStr ? Number(storedIdStr) : NaN;
+      const storedId = Number.isSafeInteger(parsedId) && parsedId > 0 ? parsedId : null;
       set({
         activationCode: storedCode,
         driverName: storedName,
@@ -53,8 +56,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         jobTemplate: storedTemplate === 'worker_shuttle' || storedTemplate === 'pickup_delivery_job' ? storedTemplate : null,
         isLoading: false,
       });
-    } catch (e) {
-      set({ activationCode: null, driverName: null, driverId: null, isLoading: false });
+    } catch {
+      set({ activationCode: null, driverName: null, driverId: null, jobTemplate: null, isLoading: false });
     }
   },
 
@@ -114,7 +117,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.warn("SecureStore failed to delete job template:", e);
     }
 
-    set({ activationCode: null, driverName: null, driverId: null, jobTemplate: null });
-    router.replace('/');
+    // Root route protection removes the signed-in history when the session is cleared.
+    set({ code: '', activationCode: null, driverName: null, driverId: null, jobTemplate: null });
   },
 }));

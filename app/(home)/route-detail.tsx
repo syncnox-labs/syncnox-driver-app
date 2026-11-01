@@ -432,9 +432,10 @@ function RouteDetailContent({ routeId }: { routeId?: string }) {
               accessibilityLabel={isSearchOpen ? 'Close search' : 'Search jobs'}
               accessibilityState={{ expanded: isSearchOpen }}
               activeOpacity={0.7}
-              style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#2C2C2E', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              hitSlop={8}
+              style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, backgroundColor: '#2C2C2E', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
             >
-              <Ionicons name={isSearchOpen ? 'close' : 'search'} size={21} color={G} />
+              <Ionicons name={isSearchOpen ? 'close' : 'search'} size={14} color={G} />
             </TouchableOpacity>
           </View>
 

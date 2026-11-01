@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TextInput,
+  type TextInputInstance,
   TouchableOpacity,
   Pressable,
   KeyboardAvoidingView,
@@ -10,7 +11,6 @@ import {
   StatusBar,
   ScrollView,
 } from "react-native";
-import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuthStore } from "@/store/auth.store";
 import SyncnoxMark from "@/components/SyncnoxMark";
@@ -49,7 +49,7 @@ function UnderlineKeyInput({
 }) {
   const [digits, setDigits] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   const handleChange = (text: string) => {
     const cleaned = text.replace(/\D/g, "").slice(0, 12);
@@ -154,9 +154,7 @@ export default function LoginScreen() {
     try {
       await new Promise((r) => setTimeout(r, 800));
       const res = await login();
-      if (res.success) {
-        router.replace('/(home)/(tabs)/home');
-      } else {
+      if (!res.success) {
         setError(res.error || 'Invalid key. Contact your dispatcher.');
       }
     } catch {
@@ -168,7 +166,7 @@ export default function LoginScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000000' }}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView
