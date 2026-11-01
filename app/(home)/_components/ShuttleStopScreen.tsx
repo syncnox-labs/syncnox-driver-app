@@ -14,8 +14,9 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import GradientBackground from '@/components/ui/GradientBackground';
+import NavigateButton from '@/components/ui/NavigateButton';
 import { useRouteStore } from '@/store/route.store';
-import { AssignedRoute, NoShowScope, RouteStop, StopProgress } from '@/types/route.types';
+import { AssignedRoute, RouteStop, StopProgress } from '@/types/route.types';
 import {
   formatWaiting,
   getDoneLabel,
@@ -81,12 +82,13 @@ export default function ShuttleStopScreen({ route, stops }: Props) {
     pending: passengers.filter((p) => p.progress !== 'skipped' && draft[p.stopId] === 'pending').length,
   };
 
-  async function submit(scope: NoShowScope) {
+  async function handleConfirm() {
+    if (changes.length === 0 || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await updateBatchStopStatus(
         route.route_id,
-        changes.map((p) => ({ stopId: p.stopId, status: draft[p.stopId], noShowScope: scope })),
+        changes.map((p) => ({ stopId: p.stopId, status: draft[p.stopId], noShowScope: 'this_leg' })),
       );
       router.back();
     } catch {
@@ -94,25 +96,6 @@ export default function ShuttleStopScreen({ route, stops }: Props) {
     } finally {
       setIsSubmitting(false);
     }
-  }
-
-  function handleConfirm() {
-    if (changes.length === 0) return;
-    const newNoShows = changes.filter((p) => isPickup && draft[p.stopId] === 'failed');
-    if (newNoShows.length === 0) {
-      submit('this_leg');
-      return;
-    }
-    const names = newNoShows.map((p) => p.name).join(', ');
-    Alert.alert(
-      'Mark as no-show?',
-      `${names}\n\nRemove only from this trip, or cancel the whole booking (including the return trip)?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'This trip only', onPress: () => submit('this_leg') },
-        { text: 'This + return trip', style: 'destructive', onPress: () => submit('job') },
-      ],
-    );
   }
 
   function handleNavigate() {
@@ -292,23 +275,7 @@ export default function ShuttleStopScreen({ route, stops }: Props) {
                 {first.waiting_position === 'right' ? 'at the next stop' : 'at this stop'})
               </Text>
             )}
-            <TouchableOpacity
-              onPress={handleNavigate}
-              activeOpacity={0.8}
-              style={{
-                marginTop: 14,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 7,
-                paddingVertical: 12,
-                borderRadius: 12,
-                backgroundColor: '#30D158',
-              }}
-            >
-              <Ionicons name="navigate" size={16} color="#000" />
-              <Text style={{ color: '#000', fontSize: 14, fontWeight: '700' }}>Navigate</Text>
-            </TouchableOpacity>
+            <NavigateButton onPress={handleNavigate} style={{ marginTop: 14 }} />
           </View>
 
           <View style={{ marginHorizontal: 16 }}>

@@ -14,6 +14,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import GradientBackground from '@/components/ui/GradientBackground';
+import NavigateButton, { NavigationIcon } from '@/components/ui/NavigateButton';
 import { useRouteStore, findStopInRoutes } from '@/store/route.store';
 import { useAuthStore } from '@/store/auth.store';
 import { RouteStop } from '@/types/route.types';
@@ -166,7 +167,7 @@ export default function StopDetailScreen() {
   if (!stop) {
     return (
       <GradientBackground isBlack>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle="light-content" />
         <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: 'rgba(48,209,88,0.08)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
             <Ionicons name="alert-circle-outline" size={24} color="#30D158" />
@@ -274,7 +275,7 @@ export default function StopDetailScreen() {
 
   return (
     <GradientBackground isBlack>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
 
         {/* ─── Header ─── */}
@@ -424,23 +425,7 @@ export default function StopDetailScreen() {
           {!isDone && (
             <View style={{ marginHorizontal: 16, marginTop: 16, flexDirection: 'row', gap: 10 }}>
               {/* Navigate */}
-              <TouchableOpacity
-                onPress={handleNavigate}
-                style={{
-                  flex: 1,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 7,
-                  paddingVertical: 14,
-                  borderRadius: 14,
-                  backgroundColor: '#30D158',
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="navigate" size={17} color="#000" />
-                <Text style={{ color: '#000', fontSize: 14, fontWeight: '700' }}>Navigate</Text>
-              </TouchableOpacity>
+              <NavigateButton onPress={handleNavigate} style={{ flex: 1 }} />
 
               {/* Complete */}
               <TouchableOpacity
@@ -576,7 +561,7 @@ export default function StopDetailScreen() {
                 <Text style={{ color: '#FFFFFF', fontSize: 14, lineHeight: 20, flex: 1 }}>
                   {address}
                 </Text>
-                <Ionicons name="open-outline" size={14} color="rgba(48,209,88,0.35)" style={{ marginLeft: 8 }} />
+                <NavigationIcon color="#30D158" />
               </TouchableOpacity>
             </View>
           )}

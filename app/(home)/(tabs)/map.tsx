@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import NavigateButton, { NavigationIcon } from "@/components/ui/NavigateButton";
 // import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -637,9 +638,7 @@ export default function MapTabScreen() {
           ? viewedRoute.depot.name || "End Depot"
           : "End Location"
       : isShuttle
-        ? group.passengerCount > 1
-          ? `${kindLabel} · ${group.passengerCount} passengers`
-          : `${kindLabel}${passengers[0]?.name ? ` · ${passengers[0].name}` : ""}`
+        ? `${kindLabel} · ${group.passengerCount} ${group.passengerCount === 1 ? "passenger" : "passengers"}`
         : kindLabel;
 
     const address =
@@ -946,31 +945,7 @@ export default function MapTabScreen() {
               {/* Navigate button */}
               {hasCoords &&
                 (isTerminal || group.progress === "pending" || group.progress === "partial") && (
-                  <TouchableOpacity
-                    onPress={() => openNavigation(rep)}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                      backgroundColor: "#30D158",
-                      borderRadius: 12,
-                      paddingVertical: 11,
-                      paddingHorizontal: 16,
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="navigate" size={14} color="#000000" />
-                    <Text
-                      style={{
-                        color: "#000000",
-                        fontSize: 13,
-                        fontWeight: "700",
-                      }}
-                    >
-                      Navigate
-                    </Text>
-                  </TouchableOpacity>
+                  <NavigateButton onPress={() => openNavigation(rep)} />
                 )}
 
               {/* View Details / Manifest */}
@@ -1165,7 +1140,7 @@ export default function MapTabScreen() {
                   justifyContent: "center",
                 }}
               >
-                <Ionicons name="navigate" size={14} color="#30D158" />
+                <NavigationIcon />
               </View>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>

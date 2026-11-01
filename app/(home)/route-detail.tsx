@@ -5,17 +5,22 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Alert,
   Linking,
   Platform,
   ActivityIndicator,
+  TextInput,
+  Keyboard,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { useRouteStore } from '@/store/route.store';
 import { useAuthStore } from '@/store/auth.store';
+import { useStartRoute } from '@/hooks/useStartRoute';
+import NavigateButton, { NavigationIcon } from '@/components/ui/NavigateButton';
 import { formatDistance } from '@/utils/distance.utils';
+import { filterRouteStopGroups } from '@/utils/routeSearch.utils';
 import { JobTemplateType, RouteStop } from '@/types/route.types';
 import {
   GroupedRouteStop,
@@ -42,14 +47,6 @@ function BackArrow() {
   return (
     <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
       <Path d="M10 3L5 8l5 5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
-function NavIcon({ color }: { color: string }) {
-  return (
-    <Svg width={17} height={17} viewBox="0 0 17 17" fill="none">
-      <Path d="M8.5 2L14 8.5l-3-1-1 3.5L2 4l6.5 4V2z" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -157,8 +154,9 @@ function TerminalRow({
         )}
       </View>
       {(!!stop.location || !!address) && (
-        <TouchableOpacity onPress={onNavigate} activeOpacity={0.7} hitSlop={8}>
-          <NavIcon color={G} />
+        <TouchableOpacity onPress={onNavigate} activeOpacity={0.7} hitSlop={8}
+          accessibilityRole="button" accessibilityLabel={`Navigate to ${group.kind === 'start' ? 'start' : 'end'} location`}>
+          <NavigationIcon color={G} size={17} />
         </TouchableOpacity>
       )}
     </View>
@@ -190,9 +188,7 @@ function GroupRow({
   const passengers = shuttle ? getGroupPassengers(group) : [];
   const single = [rep.job?.first_name, rep.job?.last_name].filter(Boolean).join(' ') || rep.job?.business_name;
   const title = shuttle
-    ? passengers.length > 1
-      ? `${kindLabel} · ${passengers.length} passengers`
-      : `${kindLabel} · ${passengers[0]?.name ?? 'Passenger'}`
+    ? `${kindLabel} · ${passengers.length} ${passengers.length === 1 ? 'passenger' : 'passengers'}`
     : single || `Stop #${group.displayNumber ?? ''}`;
   const preview =
     shuttle && passengers.length > 1
@@ -277,9 +273,16 @@ function GroupRow({
 // ─── Route Detail Screen ──────────────────────────────────────────────────────
 export default function RouteDetailScreen() {
   const { routeId } = useLocalSearchParams<{ routeId: string }>();
-  const { assignedRoute, allRoutes, distanceUnit, startRoute, selectRoute } = useRouteStore();
+  return <RouteDetailContent key={routeId} routeId={routeId} />;
+}
+
+function RouteDetailContent({ routeId }: { routeId?: string }) {
+  const { assignedRoute, allRoutes, distanceUnit, selectRoute } = useRouteStore();
   const authTemplate = useAuthStore((s) => s.jobTemplate);
-  const [isStarting, setIsStarting] = useState(false);
+  const { requestStart, startingRouteId } = useStartRoute();
+  const isStarting = startingRouteId !== null;
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Find target route matching routeId, fallback to assignedRoute or first available route
   const route =
@@ -291,7 +294,7 @@ export default function RouteDetailScreen() {
   if (!route) {
     return (
       <View style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle="light-content" />
         <Text style={{ color: LABEL, fontSize: 17 }}>Route not found</Text>
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
           <Text style={{ color: G, fontSize: 15 }}>← Go back</Text>
@@ -304,6 +307,9 @@ export default function RouteDetailScreen() {
   const shuttle = template === 'worker_shuttle';
   const allStops = route.stops ?? [];
   const groups = groupRouteStops(route, template);
+  const filteredGroups = filterRouteStopGroups(groups, searchQuery);
+  const isFiltering = searchQuery.trim().length > 0;
+  const matchingStops = filteredGroups.filter((g) => g.kind !== 'start' && g.kind !== 'end').length;
   const visitGroups = groups.filter((g) => g.kind !== 'start' && g.kind !== 'end');
   const jobStops = allStops.filter((s) => !!s.job);
   const totalJobs = jobStops.length > 0 ? jobStops.length : allStops.length;
@@ -314,18 +320,7 @@ export default function RouteDetailScreen() {
   // Next visit to navigate to: the first group with anything still pending
   const nextGroup = visitGroups.find((g) => g.progress === 'pending' || g.progress === 'partial');
   const nextStop = nextGroup?.representative;
-  const canStart = shuttle && (route.assignment_status === 'pending' || route.assignment_status === 'acknowledged');
-
-  async function handleStart() {
-    setIsStarting(true);
-    try {
-      await startRoute(route!.route_id);
-    } catch {
-      Alert.alert('Error', 'Could not start the route. Please try again.');
-    } finally {
-      setIsStarting(false);
-    }
-  }
+  const canStart = route.assignment_status === 'pending' || route.assignment_status === 'acknowledged';
 
   function openStop(group: GroupedRouteStop) {
     router.push({
@@ -351,7 +346,13 @@ export default function RouteDetailScreen() {
   const durMin = Math.floor((durSec % 3600) / 60);
   const durationLabel = durSec > 0 ? `${durH}h ${durMin}m` : '—';
 
-  const isLive = route.assignment_status === 'in_progress' || route.assignment_status === 'acknowledged';
+  function toggleSearch() {
+    if (isSearchOpen) {
+      setSearchQuery('');
+      Keyboard.dismiss();
+    }
+    setIsSearchOpen(!isSearchOpen);
+  }
 
   function handleNavigateTo(stop: RouteStop) {
     const lat = stop.location?.lat || stop.job?.location?.lat;
@@ -372,7 +373,7 @@ export default function RouteDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000', position: 'relative' }}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
         {/* ── Header ── */}
@@ -425,12 +426,43 @@ export default function RouteDetailScreen() {
             >
               <Text style={{ fontSize: 12, fontWeight: '600', color: G }}>Map</Text>
             </TouchableOpacity>
-            {isLive && (
-              <View style={{ backgroundColor: 'rgba(48,209,88,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, flexShrink: 0 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: G }}>Live</Text>
-              </View>
-            )}
+            <TouchableOpacity
+              onPress={toggleSearch}
+              accessibilityRole="button"
+              accessibilityLabel={isSearchOpen ? 'Close search' : 'Search jobs'}
+              accessibilityState={{ expanded: isSearchOpen }}
+              activeOpacity={0.7}
+              style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#2C2C2E', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            >
+              <Ionicons name={isSearchOpen ? 'close' : 'search'} size={21} color={G} />
+            </TouchableOpacity>
           </View>
+
+          {isSearchOpen && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: CARD, borderWidth: 1, borderColor: G, borderRadius: 12, paddingHorizontal: 12, marginBottom: 16 }}>
+              <Ionicons name="search" size={18} color={LABEL} />
+              <TextInput
+                autoFocus
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Name, ID, phone, address, notes…"
+                placeholderTextColor={LABEL}
+                accessibilityLabel="Search jobs in this route"
+                autoCorrect={false}
+                autoCapitalize="none"
+                returnKeyType="search"
+                onSubmitEditing={() => Keyboard.dismiss()}
+                selectionColor={G}
+                style={{ flex: 1, minWidth: 0, minHeight: 48, paddingVertical: 12, color: '#fff', fontSize: 15 }}
+              />
+              {!!searchQuery && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel="Clear search"
+                  style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="close-circle" size={20} color={LABEL} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           {/* ── Stats grid ── */}
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
@@ -487,10 +519,10 @@ export default function RouteDetailScreen() {
             </View>
           </View>
 
-          {/* ── Start route (shuttle): auto check-in for a team leader ── */}
+          {/* ── Start route after confirming the assigned vehicle ── */}
           {canStart && (
             <TouchableOpacity
-              onPress={handleStart}
+              onPress={() => requestStart(route)}
               disabled={isStarting}
               activeOpacity={0.85}
               style={{
@@ -513,32 +545,16 @@ export default function RouteDetailScreen() {
 
           {/* ── Navigate to next stop CTA ── */}
           {nextStop && (
-            <TouchableOpacity
+            <NavigateButton
               onPress={() => handleNavigateTo(nextStop)}
-              activeOpacity={0.85}
-              style={{
-                height: 50,
-                borderRadius: 14,
-                backgroundColor: 'rgba(48,209,88,0.1)',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                borderWidth: 1.5,
-                borderColor: 'rgba(48,209,88,0.25)',
-                marginBottom: 14,
-              }}
-            >
-              <NavIcon color={G} />
-              <Text style={{ fontSize: 17, fontWeight: '600', color: G }}>
-                Navigate to Stop #{nextGroup?.displayNumber ?? '?'}
-              </Text>
-            </TouchableOpacity>
+              label={`Navigate to Stop #${nextGroup?.displayNumber ?? '?'}`}
+              style={{ marginBottom: 14 }}
+            />
           )}
         </View>
 
         {/* ── Dispatcher card ── */}
-        <View style={{ marginHorizontal: 20, marginBottom: 12, backgroundColor: CARD, borderRadius: 14, padding: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* <View style={{ marginHorizontal: 20, marginBottom: 12, backgroundColor: CARD, borderRadius: 14, padding: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View>
             <Text style={{ fontSize: 11, color: LABEL, marginBottom: 2 }}>Dispatcher</Text>
             <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>Operations Team</Text>
@@ -564,35 +580,47 @@ export default function RouteDetailScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </View> */}
 
         {/* ── Stop list ── */}
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
-          <Text style={{ fontSize: 11, color: LABEL, letterSpacing: 1, marginBottom: 8, paddingLeft: 4, fontFamily: 'monospace', fontWeight: '600' }}>
-            ALL STOPS ({totalStops})
+          <Text accessibilityLiveRegion="polite" style={{ fontSize: 11, color: LABEL, letterSpacing: 1, marginBottom: 8, paddingLeft: 4, fontFamily: 'monospace', fontWeight: '600' }}>
+            {isFiltering ? `MATCHING STOPS (${matchingStops}/${totalStops})` : `ALL STOPS (${totalStops})`}
           </Text>
           <View style={{ backgroundColor: CARD, borderRadius: 16, overflow: 'hidden' }}>
-            {groups.map((group, i) => (
+            {filteredGroups.length === 0 && isFiltering && (
+              <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
+                <Ionicons name="search-outline" size={28} color={LABEL} />
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>No matching stops</Text>
+                <Text style={{ color: LABEL, fontSize: 13, textAlign: 'center' }}>Try a different name, ID, phone number, address, or note.</Text>
+                <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 16 }}>
+                  <Text style={{ color: G, fontSize: 15, fontWeight: '600' }}>Clear search</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {filteredGroups.map((group, i) => (
               <View key={group.key}>
                 {group.kind === 'start' || group.kind === 'end' ? (
                   <TerminalRow
                     group={group}
-                    isLast={i === groups.length - 1}
+                    isLast={i === filteredGroups.length - 1}
                     onNavigate={() => handleNavigateTo(group.representative)}
                   />
                 ) : (
                   <GroupRow
                     group={group}
                     template={template}
-                    isLast={i === groups.length - 1}
+                    isLast={i === filteredGroups.length - 1}
                     onPress={() => openStop(group)}
                   />
                 )}
-                {i < groups.length - 1 && <WaitingBanner stop={group.stops[group.stops.length - 1]} />}
+                {!isFiltering && i < filteredGroups.length - 1 && <WaitingBanner stop={group.stops[group.stops.length - 1]} />}
               </View>
             ))}
           </View>

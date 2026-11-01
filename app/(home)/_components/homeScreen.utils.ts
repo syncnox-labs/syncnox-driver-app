@@ -5,9 +5,24 @@ import { getStopProgress, isStopFinished } from '@/utils/shuttleRoute.utils';
 // Time formatting
 // ─────────────────────────────────────────────────────────────── //
 
-export function formatTime(isoStr?: string): string {
-  if (!isoStr) return '--:--';
-  const d = new Date(isoStr);
+export function formatTime(value?: string | null): string {
+  const input = value?.trim();
+  if (!input) return '--:--';
+
+  // Passenger pickup times are local clock values, not ISO timestamps.
+  const clock = /^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?$/.exec(input);
+  let d: Date;
+  if (clock) {
+    const hours = Number(clock[1]);
+    const minutes = Number(clock[2]);
+    const seconds = Number(clock[3] ?? 0);
+    if (hours > 23 || minutes > 59 || seconds > 59) return '--:--';
+    d = new Date(2000, 0, 1, hours, minutes, seconds);
+  } else {
+    d = new Date(input);
+  }
+
+  if (Number.isNaN(d.getTime())) return '--:--';
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 

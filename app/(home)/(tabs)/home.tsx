@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useAuthStore } from '@/store/auth.store';
 import { useRouteStore } from '@/store/route.store';
+import { useStartRoute } from '@/hooks/useStartRoute';
 import { AssignedRoute } from '@/types/route.types';
 import { formatDistance } from '@/utils/distance.utils';
 import {
@@ -136,12 +137,14 @@ function RouteCard({
   defaultTemplate,
   onPress,
   onStart,
+  startingRouteId,
 }: {
   route: AssignedRoute;
   tab: RouteTab;
   defaultTemplate?: AssignedRoute['job_template_type'] | null;
   onPress: () => void;
   onStart: () => void;
+  startingRouteId: number | null;
 }) {
   const tpl = route.job_template_type ?? defaultTemplate ?? 'pickup_delivery_job';
   const isShuttle = tpl === 'worker_shuttle';
@@ -162,6 +165,7 @@ function RouteCard({
   const isActive = tab === 'active';
   const isUpcoming = tab === 'upcoming';
   const isInProgress = route.assignment_status === 'in_progress';
+  const isStarting = startingRouteId === route.route_id;
 
   const distanceUnit = useRouteStore((s) => s.distanceUnit);
 
@@ -184,12 +188,7 @@ function RouteCard({
   const legLabel = getRouteLegLabel(route);
   const vehicleChip = formatVehicleChip(route.vehicle);
 
-  const primaryStatLabel = isShuttle ? 'Passengers' : 'Jobs';
-  const primaryStatValue = isShuttle
-    ? `${passengerCount}`
-    : isUpcoming
-      ? `${totalActions}`
-      : `${completedActions}/${totalActions}`;
+  const jobStatValue = isUpcoming ? `${totalActions}` : `${completedActions}/${totalActions}`;
 
   const pillStatus = isInProgress ? 'in_progress' : tab === 'done' ? 'completed' : route.assignment_status === 'acknowledged' && isUpcoming ? 'upcoming' : tab;
 
@@ -254,8 +253,8 @@ function RouteCard({
           </View>
         )}
 
-        {/* Date + time */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        {/* Date, time, and passenger count */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 12, rowGap: 6, marginBottom: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <CalIcon />
             <Text style={{ fontSize: 13, color: LABEL }}>{dateLabel}</Text>
@@ -266,12 +265,17 @@ function RouteCard({
               <Text style={{ fontSize: 13, color: LABEL }}>{durationLabel}</Text>
             </View>
           )}
+          {isShuttle && (
+            <Text style={{ fontSize: 13, color: LABEL }}>
+              {passengerCount} {passengerCount === 1 ? 'passenger' : 'passengers'}
+            </Text>
+          )}
         </View>
 
         {/* Stats row */}
         <View style={{ flexDirection: 'row', gap: 18, marginBottom: !isUpcoming ? 12 : 0 }}>
           {[
-            { label: primaryStatLabel, value: primaryStatValue },
+            ...(!isShuttle ? [{ label: 'Jobs', value: jobStatValue }] : []),
             { label: 'Stops', value: `${totalStops}` },
             { label: 'Distance', value: distanceMi },
             { label: 'Est.', value: durationLabel },
@@ -303,6 +307,7 @@ function RouteCard({
         <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
           <TouchableOpacity
             onPress={onStart}
+            disabled={startingRouteId !== null}
             activeOpacity={0.85}
             style={{
               height: 44,
@@ -314,9 +319,10 @@ function RouteCard({
               gap: 8,
               borderWidth: isInProgress ? 1.5 : 0,
               borderColor: isInProgress ? 'rgba(48,209,88,0.25)' : 'transparent',
+              opacity: isStarting ? 0.6 : 1,
             }}
           >
-            <PlayIcon color={isInProgress ? G : '#000'} />
+            {isStarting ? <ActivityIndicator size="small" color="#000" /> : <PlayIcon color={isInProgress ? G : '#000'} />}
             <Text
               style={{
                 fontSize: 15,
@@ -324,7 +330,7 @@ function RouteCard({
                 color: isInProgress ? G : '#000',
               }}
             >
-              {isInProgress ? 'Continue Route' : 'Start Route'}
+              {isStarting ? 'Starting…' : isInProgress ? 'Continue Route' : 'Start Route'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -374,10 +380,11 @@ export default function RoutesScreen() {
   const { assignedRoute, allRoutes, distanceUnit, isLoading, fetchMyRoutes, selectRoute } = useRouteStore();
   const authTemplate = useAuthStore((s) => s.jobTemplate);
   const [tab, setTab] = useState<RouteTab>('active');
+  const { requestStart, startingRouteId } = useStartRoute();
 
   useEffect(() => {
     fetchMyRoutes();
-  }, []);
+  }, [fetchMyRoutes]);
 
   // Current date label
   const today = new Date();
@@ -481,7 +488,7 @@ export default function RoutesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* ── Header ── */}
         <View style={{ paddingHorizontal: 20, paddingTop: 4 }}>
@@ -578,7 +585,14 @@ export default function RoutesScreen() {
                   tab={tab}
                   defaultTemplate={authTemplate}
                   onPress={() => openRouteDetail(route)}
-                  onStart={() => openRouteDetail(route)}
+                  onStart={() => {
+                    if (route.assignment_status === 'in_progress') {
+                      openRouteDetail(route);
+                    } else {
+                      requestStart(route, () => openRouteDetail(route));
+                    }
+                  }}
+                  startingRouteId={startingRouteId}
                 />
               ))
             )}
