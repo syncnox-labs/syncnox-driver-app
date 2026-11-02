@@ -51,6 +51,7 @@ function availableScreens(auth) {
     'expo-router': { Stack },
     react: { useEffect() {} },
     '@/store/auth.store': { useAuthStore: () => auth.getState() },
+    '@/hooks/useRouteReminders': { useRouteReminders() {} },
     'react-native': { View: Component, StatusBar: Component, LogBox: { ignoreAllLogs() {} } },
     'react-native-paper': { ActivityIndicator: Component, PaperProvider: Component, MD3DarkTheme: { colors: {} } },
   });

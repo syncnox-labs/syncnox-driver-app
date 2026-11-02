@@ -2,6 +2,7 @@ import "../global.css";
 import { Stack } from "expo-router";
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/auth.store";
+import { useRouteReminders } from "@/hooks/useRouteReminders";
 import { View, StatusBar, LogBox } from "react-native";
 
 import { ActivityIndicator, PaperProvider, MD3DarkTheme } from "react-native-paper";
@@ -31,6 +32,7 @@ const syncnoxTheme = {
  * restores the saved session before mounting mutually exclusive guest / signed-in routes.
  */
 export default function RootLayout() {
+  useRouteReminders();
   const { activationCode, isLoading, checkStoredCode } = useAuthStore();
 
   useEffect(() => {

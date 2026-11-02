@@ -60,6 +60,14 @@
             "enableShrinkResourcesInReleaseBuilds": false
           }
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "route-reminders",
+          "color": "#30D158",
+          "enableRemoteNotifications": false
+        }
       ]
     ],
     "experiments": {

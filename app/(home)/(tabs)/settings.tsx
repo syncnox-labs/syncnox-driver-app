@@ -8,6 +8,7 @@ import {
   StatusBar,
   Alert,
   Platform,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -168,11 +169,7 @@ export default function SettingsTabScreen() {
 
   return (
     <GradientBackground isBlack>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
+      <StatusBar barStyle="light-content" />
       <SafeAreaView className="flex-1" edges={["top"]}>
         {/* Header */}
         <View className="flex-row items-center justify-between px-5 pt-2 pb-3 border-b border-white/[0.05]">
@@ -283,6 +280,12 @@ export default function SettingsTabScreen() {
 
           {/* PREFERENCES section */}
           <SectionHeader title="Preferences" />
+          <SettingRow
+            icon="notifications-outline"
+            label="Route reminders"
+            value="30 min before start"
+            onPress={Platform.OS === 'web' ? undefined : () => { void Linking.openSettings(); }}
+          />
           <SettingRow
             icon="speedometer-outline"
             label="Distance unit"

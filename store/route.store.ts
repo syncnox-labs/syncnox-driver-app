@@ -11,6 +11,8 @@ import {
 import { DistanceUnit } from '@/utils/distance.utils';
 import { isStopFinished } from '@/utils/shuttleRoute.utils';
 
+let routesFetchRevision = 0;
+
 export type StopStatusInput = 'completed' | 'failed' | 'pending';
 
 export interface StopUpdateInput {
@@ -40,6 +42,8 @@ interface RouteState {
   distanceUnit: DistanceUnit;           // 'miles' | 'km'
   isLoading: boolean;
   error: string | null;
+  routesOwnerId: number | null;
+  tenantTimezone: string | null;
 
   fetchMyRoute: () => Promise<void>;
   fetchMyRoutes: (options?: { silent?: boolean }) => Promise<void>;
@@ -130,6 +134,8 @@ export const useRouteStore = create<RouteState>((set, get) => ({
   distanceUnit: 'miles',
   isLoading: false,
   error: null,
+  routesOwnerId: null,
+  tenantTimezone: null,
 
   fetchMyRoute: async () => {
     set({ isLoading: true, error: null });
@@ -159,6 +165,10 @@ export const useRouteStore = create<RouteState>((set, get) => ({
   },
 
   fetchMyRoutes: async (options) => {
+    const revision = ++routesFetchRevision;
+    const session = useAuthStore.getState();
+    const ownerId = session.driverId;
+    const activationCode = session.activationCode;
     const showSpinner = !options?.silent || get().allRoutes.length === 0;
     if (showSpinner) set({ isLoading: true, error: null });
     try {
@@ -166,7 +176,9 @@ export const useRouteStore = create<RouteState>((set, get) => ({
         routes: AssignedRoute[];
         distance_unit?: string;
         job_template?: JobTemplateType;
+        tenant_timezone?: string;
       }>('/driver/my-routes');
+      if (revision !== routesFetchRevision || useAuthStore.getState().activationCode !== activationCode) return;
       const routes = response.data.routes ?? [];
       const unitRaw = response.data.distance_unit;
       const unit: DistanceUnit = unitRaw === 'km' || unitRaw === 'kilometers' ? 'km' : 'miles';
@@ -193,15 +205,18 @@ export const useRouteStore = create<RouteState>((set, get) => ({
           selected != null && sanitizedRoutes.some((r) => r.route_id === selected) ? selected : null,
         distanceUnit: unit,
         isLoading: false,
+        error: null,
+        routesOwnerId: ownerId,
+        tenantTimezone: response.data.tenant_timezone ?? null,
       });
     } catch (e: any) {
+      if (revision !== routesFetchRevision || useAuthStore.getState().activationCode !== activationCode) return;
       const is404 = e?.response?.status === 404;
       set({
-        allRoutes: [],
-        assignedRoute: null,
-        selectedRouteId: null,
         isLoading: false,
         error: is404 ? null : 'Failed to load routes',
+        // A failed refresh does not revoke assignments or their scheduled reminders.
+        ...(is404 ? { allRoutes: [], assignedRoute: null, selectedRouteId: null, routesOwnerId: ownerId } : {}),
       });
     }
   },
@@ -229,7 +244,16 @@ export const useRouteStore = create<RouteState>((set, get) => ({
 
   /** Starts a route; the server auto-checks-in a team leader riding their own booking. */
   startRoute: async (routeId: number) => {
+    const activationCode = useAuthStore.getState().activationCode;
     await apiClient.post(`/driver/routes/${routeId}/start`);
+    if (useAuthStore.getState().activationCode !== activationCode) return;
+    // Update immediately so a pending reminder is cancelled even if the refresh fails.
+    set((state) => ({
+      allRoutes: state.allRoutes.map((route) => route.route_id === routeId ? { ...route, assignment_status: 'in_progress' } : route),
+      assignedRoute: state.assignedRoute?.route_id === routeId
+        ? { ...state.assignedRoute, assignment_status: 'in_progress' } : state.assignedRoute,
+      error: null,
+    }));
     // Re-sync: the server may have boarded the team leader.
     await get().fetchMyRoutes({ silent: true });
   },
@@ -282,5 +306,8 @@ export const useRouteStore = create<RouteState>((set, get) => ({
     }
   },
 
-  clearRoute: () => set({ assignedRoute: null, allRoutes: [], selectedRouteId: null, error: null }),
+  clearRoute: () => {
+    routesFetchRevision++;
+    set({ assignedRoute: null, allRoutes: [], selectedRouteId: null, error: null, routesOwnerId: null, tenantTimezone: null });
+  },
 }));
