@@ -11,7 +11,8 @@ import {
   Alert,
   Linking,
 } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
+import RouteMap from "@/components/maps/RouteMap";
+import type { RouteMapHandle } from "@/components/maps/RouteMap.types";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import NavigateButton, { NavigationIcon } from "@/components/ui/NavigateButton";
 // import Svg, { Path } from "react-native-svg";
@@ -306,7 +307,7 @@ export default function MapTabScreen() {
     };
   }, [viewedRoute]);
 
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<RouteMapHandle>(null);
   const flatListRef = useRef<FlatList<GroupedRouteStop>>(null);
   const isScrollingRef = useRef<boolean>(false);
 
@@ -559,6 +560,7 @@ export default function MapTabScreen() {
     const { latitude: lat, longitude: lng } = coords;
     const url = Platform.select({
       ios: `maps://app?daddr=${lat},${lng}`,
+      web: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
       default: `google.navigation:q=${lat},${lng}`,
     });
     Linking.openURL(url!).catch(() =>
@@ -1048,10 +1050,8 @@ export default function MapTabScreen() {
   return (
     <View style={{ paddingTop: insets.top }} className="flex-1 bg-black">
       {/* Map View Panel */}
-      <MapView
+      <RouteMap
         ref={mapRef}
-        provider={PROVIDER_DEFAULT}
-        style={{ flex: 1, width: "100%", height: "100%" }}
         customMapStyle={darkMapStyle}
         initialRegion={{
           latitude: DEFAULT_LATITUDE,
@@ -1059,51 +1059,30 @@ export default function MapTabScreen() {
           latitudeDelta: 0.25,
           longitudeDelta: 0.25,
         }}
-        showsUserLocation
-        showsMyLocationButton={false}
-      >
-        {/* Route Polyline — glow layer + main line */}
-        {polylineCoords.length > 1 && (
-          <>
-            <Polyline
-              coordinates={polylineCoords}
-              strokeColor="rgba(48,209,88,0.15)"
-              strokeWidth={10}
-            />
-            <Polyline
-              coordinates={polylineCoords}
-              strokeColor="#30D158"
-              strokeWidth={3.5}
-              lineDashPattern={Platform.OS === "android" ? [12, 6] : undefined}
-            />
-          </>
-        )}
-
-        {/* Draw Custom Markers (1 per physical visit group) */}
-        {groups.map((group, index) => {
+        coordinates={polylineCoords}
+        markers={groups.flatMap((group, index) => {
           const coords = getStopCoords(group.representative);
-          if (!coords) return null;
+          if (!coords) return [];
 
           const isSelected = safeSelectedIndex === index;
           const mStyle = getMarkerStyle(group, index);
 
-          return (
-            <Marker
-              key={group.key}
-              coordinate={coords}
-              onPress={() => zoomToGroup(group, index)}
-              anchor={{ x: 0.5, y: 1 }}
-              tracksViewChanges={tracksChanges}
-            >
+          return [{
+            id: group.key,
+            coordinate: coords,
+            label: `${getKindLabel(group.kind, template)} ${group.displayNumber ?? index + 1}`,
+            onPress: () => zoomToGroup(group, index),
+            tracksViewChanges: tracksChanges,
+            content: (
               <PureMarkerPin
                 mStyle={mStyle}
                 label={group.displayNumber ?? index + 1}
                 isSelected={isSelected}
               />
-            </Marker>
-          );
+            ),
+          }];
         })}
-      </MapView>
+      />
 
       {/* ─── Route Progress Header (+ multi-leg switcher) ─── */}
       {viewedRoute && groups.length > 0 && (

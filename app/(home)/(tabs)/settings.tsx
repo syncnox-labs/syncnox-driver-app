@@ -104,9 +104,14 @@ export default function SettingsTabScreen() {
   const [useCircleMarkers, setUseCircleMarkers] = useState(false);
 
   const handleLogout = () => {
+    const message = "Are you sure you want to log out? You will need your activation code to log in again.";
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) void logout();
+      return;
+    }
     Alert.alert(
       "Log Out",
-      "Are you sure you want to log out? You will need your activation code to log in again.",
+      message,
       [
         { text: "Cancel", style: "cancel" },
         {

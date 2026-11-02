@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
+import * as sessionStorage from '@/utils/sessionStorage';
 import { apiClient } from '@/config/apiClient';
 import { JobTemplateType } from '@/types/route.types';
 
@@ -33,19 +33,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setJobTemplate: (template) => {
     if (get().jobTemplate === template) return;
     set({ jobTemplate: template });
-    SecureStore.setItemAsync(JOB_TEMPLATE_KEY, template).catch(() => {});
+    sessionStorage.setItemAsync(JOB_TEMPLATE_KEY, template).catch(() => {});
   },
 
   setCode: (code) => set({ code }),
 
   checkStoredCode: async () => {
     try {
-      const storedCode = await SecureStore.getItemAsync(ACTIVATION_CODE_KEY);
-      // Optional profile metadata must not invalidate a securely saved activation code.
+      const storedCode = await sessionStorage.getItemAsync(ACTIVATION_CODE_KEY);
+      // Optional profile metadata must not invalidate a saved activation code.
       const [storedName, storedIdStr, storedTemplate] = await Promise.all([
-        SecureStore.getItemAsync(DRIVER_NAME_KEY).catch(() => null),
-        SecureStore.getItemAsync(DRIVER_ID_KEY).catch(() => null),
-        SecureStore.getItemAsync(JOB_TEMPLATE_KEY).catch(() => null),
+        sessionStorage.getItemAsync(DRIVER_NAME_KEY).catch(() => null),
+        sessionStorage.getItemAsync(DRIVER_ID_KEY).catch(() => null),
+        sessionStorage.getItemAsync(JOB_TEMPLATE_KEY).catch(() => null),
       ]);
       const parsedId = storedIdStr ? Number(storedIdStr) : NaN;
       const storedId = Number.isSafeInteger(parsedId) && parsedId > 0 ? parsedId : null;
@@ -65,7 +65,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const code = get().code;
     try {
       // 1. Persist code first so the apiClient interceptor can attach it
-      await SecureStore.setItemAsync(ACTIVATION_CODE_KEY, code);
+      await sessionStorage.setItemAsync(ACTIVATION_CODE_KEY, code);
 
       // 2. Verify — interceptor auto-attaches 'activation-code' header
       const response = await apiClient.post('/driver/verify', null);
@@ -75,17 +75,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const id: number = driverData.id;
 
       // 3. Persist driver name and ID
-      await SecureStore.setItemAsync(DRIVER_NAME_KEY, name);
-      await SecureStore.setItemAsync(DRIVER_ID_KEY, String(id));
+      await sessionStorage.setItemAsync(DRIVER_NAME_KEY, name);
+      await sessionStorage.setItemAsync(DRIVER_ID_KEY, String(id));
       const template: JobTemplateType =
         driverData.active_job_template === 'worker_shuttle' ? 'worker_shuttle' : 'pickup_delivery_job';
-      await SecureStore.setItemAsync(JOB_TEMPLATE_KEY, template);
+      await sessionStorage.setItemAsync(JOB_TEMPLATE_KEY, template);
 
       set({ activationCode: code, driverName: name, driverId: id, jobTemplate: template });
       return { success: true };
     } catch (e: any) {
       // Clean up stored code on failure
-      await SecureStore.deleteItemAsync(ACTIVATION_CODE_KEY).catch(() => {});
+      await sessionStorage.deleteItemAsync(ACTIVATION_CODE_KEY).catch(() => {});
       console.error('Driver activation error:', e);
       const errorMessage = e.response?.data?.detail ?? e.message ?? 'Invalid activation code. Please try again.';
       return { success: false, error: errorMessage };
@@ -94,27 +94,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: async () => {
     try {
-      await SecureStore.deleteItemAsync(ACTIVATION_CODE_KEY);
+      await sessionStorage.deleteItemAsync(ACTIVATION_CODE_KEY);
     } catch (e) {
-      console.warn("SecureStore failed to delete activation code:", e);
+      console.warn("Session storage failed to delete activation code:", e);
     }
 
     try {
-      await SecureStore.deleteItemAsync(DRIVER_NAME_KEY);
+      await sessionStorage.deleteItemAsync(DRIVER_NAME_KEY);
     } catch (e) {
-      console.warn("SecureStore failed to delete driver name:", e);
+      console.warn("Session storage failed to delete driver name:", e);
     }
 
     try {
-      await SecureStore.deleteItemAsync(DRIVER_ID_KEY);
+      await sessionStorage.deleteItemAsync(DRIVER_ID_KEY);
     } catch (e) {
-      console.warn("SecureStore failed to delete driver id:", e);
+      console.warn("Session storage failed to delete driver id:", e);
     }
 
     try {
-      await SecureStore.deleteItemAsync(JOB_TEMPLATE_KEY);
+      await sessionStorage.deleteItemAsync(JOB_TEMPLATE_KEY);
     } catch (e) {
-      console.warn("SecureStore failed to delete job template:", e);
+      console.warn("Session storage failed to delete job template:", e);
     }
 
     // Root route protection removes the signed-in history when the session is cleared.

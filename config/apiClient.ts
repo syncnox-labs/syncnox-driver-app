@@ -1,5 +1,5 @@
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
+import * as sessionStorage from "@/utils/sessionStorage";
 
 const ACTIVATION_CODE_KEY = "syncnox_activation_code";
 const rawUrl = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -13,11 +13,11 @@ export const apiClient = axios.create({
   },
 });
 
-// Automatically attach activation-code header from SecureStore on every request
+// Use the same persisted credential as login on both web and native.
 apiClient.interceptors.request.use(
   async (config) => {
     try {
-      const code = await SecureStore.getItemAsync(ACTIVATION_CODE_KEY);
+      const code = await sessionStorage.getItemAsync(ACTIVATION_CODE_KEY);
       if (code) {
         config.headers["activation-code"] = code;
       }

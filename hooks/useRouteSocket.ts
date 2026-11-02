@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import * as sessionStorage from '@/utils/sessionStorage';
 import { useRouteStore } from '@/store/route.store';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -51,11 +51,11 @@ export function useRouteSocket() {
     let reconnectTimer: ReturnType<typeof setTimeout>;
 
     async function connect() {
-      // Prefer in-memory store values; fall back to SecureStore for code
+      // Prefer in-memory store values; fall back to persisted session storage.
       let code = activationCode;
       if (!code) {
         try {
-          code = await SecureStore.getItemAsync(ACTIVATION_CODE_KEY);
+          code = await sessionStorage.getItemAsync(ACTIVATION_CODE_KEY);
         } catch (_) {}
       }
       if (!code || !driverId || !isMounted.current) return;

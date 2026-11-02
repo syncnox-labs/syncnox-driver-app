@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const ts = require('typescript');
 
 // Exercise the real store and route declarations without requiring a native device.
-function loadTypeScript(file, dependencies) {
+function loadTypeScript(file, dependencies, globals = {}) {
   const exports = {};
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
@@ -16,6 +16,7 @@ function loadTypeScript(file, dependencies) {
     exports,
     require: name => name in dependencies ? dependencies[name] : require(name),
     console: { error() {}, warn() {} },
+    ...globals,
   });
   return exports;
 }
@@ -25,7 +26,7 @@ const keys = {
   id: 'syncnox_driver_id', template: 'syncnox_job_template',
 };
 
-function createSession(storage = new Map(), unreadable = new Set(), verify) {
+function createSession(storage = new Map(), unreadable = new Set(), verify, sessionStorage) {
   const secureStore = {
     getItemAsync: async key => {
       if (unreadable.has(key)) throw new Error('Storage unavailable');
@@ -35,13 +36,118 @@ function createSession(storage = new Map(), unreadable = new Set(), verify) {
     deleteItemAsync: async key => { storage.delete(key); },
   };
   const { useAuthStore } = loadTypeScript('store/auth.store.ts', {
-    'expo-secure-store': secureStore,
+    '@/utils/sessionStorage': sessionStorage ?? secureStore,
     '@/config/apiClient': { apiClient: { post: verify ?? (async () => {
       throw new Error('Session restoration must not require the network');
     }) } },
   });
   return useAuthStore;
 }
+
+function browserAdapter(storage = new Map()) {
+  return loadTypeScript('utils/sessionStorage.web.ts', {}, {
+    window: { localStorage: {
+      getItem: key => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, value),
+      removeItem: key => storage.delete(key),
+    } },
+  });
+}
+
+test('browser login, API headers, reload, and logout use the same persistent storage', async () => {
+  const storage = new Map();
+  const adapter = browserAdapter(storage);
+  let intercept;
+  let requests = 0;
+  const client = {
+    interceptors: { request: { use: handler => { intercept = handler; } } },
+    post: async () => {
+      const config = await intercept({ headers: {} });
+      assert.equal(config.headers['activation-code'], '123456789012');
+      requests++;
+      return { data: { name: 'Web Driver', id: 42, active_job_template: 'worker_shuttle' } };
+    },
+  };
+  loadTypeScript('config/apiClient.ts', {
+    axios: { __esModule: true, default: { create: () => client } },
+    '@/utils/sessionStorage': adapter,
+  }, { process: { env: {} } });
+  const auth = createSession(storage, new Set(), client.post, adapter);
+  await auth.getState().checkStoredCode();
+  auth.getState().setCode('123456789012');
+  assert.equal((await auth.getState().login()).success, true);
+  assert.equal(requests, 1);
+  assert.deepEqual(availableScreens(auth), ['index', '(home)']);
+
+  const reloaded = createSession(storage, new Set(), undefined, browserAdapter(storage));
+  await reloaded.getState().checkStoredCode();
+  assert.equal(reloaded.getState().driverName, 'Web Driver');
+  assert.equal(reloaded.getState().driverId, 42);
+  assert.equal(reloaded.getState().jobTemplate, 'worker_shuttle');
+  assert.equal(entryDestination(reloaded), '/(home)/(tabs)/home');
+  assert.equal((await intercept({ headers: {} })).headers['activation-code'], '123456789012');
+  await reloaded.getState().logout();
+  assert.equal(storage.size, 0);
+  assert.equal((await intercept({ headers: {} })).headers['activation-code'], undefined);
+  const restarted = createSession(storage, new Set(), undefined, browserAdapter(storage));
+  await restarted.getState().checkStoredCode();
+  assert.equal(restarted.getState().activationCode, null);
+});
+
+test('invalid browser activation does not leave a saved login', async () => {
+  const storage = new Map();
+  const auth = createSession(storage, new Set(), async () => { throw new Error('Invalid key'); }, browserAdapter(storage));
+  await auth.getState().checkStoredCode();
+  auth.getState().setCode('123456789012');
+  assert.equal((await auth.getState().login()).success, false);
+  assert.equal(storage.has(keys.code), false);
+  assert.equal(auth.getState().activationCode, null);
+});
+
+test('blocked browser storage finishes hydration and returns an actionable login error', async () => {
+  const adapter = loadTypeScript('utils/sessionStorage.web.ts', {}, {
+    window: { get localStorage() { throw new Error('Storage blocked'); } },
+  });
+  let requests = 0;
+  const auth = createSession(new Map(), new Set(), async () => { requests++; }, adapter);
+  await auth.getState().checkStoredCode();
+  assert.equal(auth.getState().isLoading, false);
+  auth.getState().setCode('123456789012');
+  const result = await auth.getState().login();
+  assert.equal(result.success, false);
+  assert.match(result.error, /Allow site data/);
+  assert.equal(requests, 0);
+  assert.equal(auth.getState().activationCode, null);
+});
+
+test('full browser storage rejects saving instead of silently losing the session', async () => {
+  const adapter = loadTypeScript('utils/sessionStorage.web.ts', {}, {
+    window: { localStorage: { setItem() { throw new Error('Quota exceeded'); } } },
+  });
+  await assert.rejects(adapter.setItemAsync(keys.code, '123456789012'), /Unable to save your login/);
+});
+
+test('browser storage can be imported and read during static rendering without a window', async () => {
+  const adapter = loadTypeScript('utils/sessionStorage.web.ts', {});
+  assert.equal(await adapter.getItemAsync(keys.code), null);
+  await adapter.deleteItemAsync(keys.code);
+  await assert.rejects(adapter.setItemAsync(keys.code, '123456789012'), /Unable to save your login/);
+});
+
+test('native session storage still delegates to SecureStore with the existing keys', async () => {
+  const storage = new Map();
+  const adapter = loadTypeScript('utils/sessionStorage.ts', {
+    'expo-secure-store': {
+      getItemAsync: async key => storage.get(key) ?? null,
+      setItemAsync: async (key, value) => { storage.set(key, value); },
+      deleteItemAsync: async key => { storage.delete(key); },
+    },
+  });
+  await adapter.setItemAsync(keys.code, '123456789012');
+  assert.equal(await adapter.getItemAsync(keys.code), '123456789012');
+  await adapter.deleteItemAsync(keys.code);
+  assert.equal(await adapter.getItemAsync(keys.code), null);
+});
 
 function availableScreens(auth) {
   const Component = () => null;

@@ -1,0 +1,14 @@
+.syncnox-route-map .syncnox-stop-marker {
+  background: transparent;
+  border: 0;
+}
+
+.syncnox-route-map .leaflet-top.leaflet-right {
+  top: 56px;
+  right: 4px;
+}
+
+/* Keep attribution visible above the stop cards on narrow screens. */
+.syncnox-route-map .leaflet-bottom.leaflet-right {
+  bottom: 50%;
+}
