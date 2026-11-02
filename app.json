@@ -22,12 +22,7 @@
         "monochromeImage": "./assets/images/syncnox-android-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.mohsinali530121.syncnoxdriverapp",
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyAUOmd-oe3hRx0ZmxQhfOD8ufgGIHRt8Ag"
-        }
-      }
+      "package": "com.mohsinali530121.syncnoxdriverapp"
     },
     "web": {
       "output": "static",
