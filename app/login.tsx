@@ -1,11 +1,9 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   TextInput,
-  type TextInputInstance,
   TouchableOpacity,
-  Pressable,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
@@ -49,7 +47,6 @@ function UnderlineKeyInput({
 }) {
   const [digits, setDigits] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const inputRef = useRef<TextInputInstance>(null);
 
   const handleChange = (text: string) => {
     const cleaned = text.replace(/\D/g, "").slice(0, 12);
@@ -58,41 +55,38 @@ function UnderlineKeyInput({
     setCode(cleaned);
   };
 
-  const handlePress = () => {
-    if (inputRef.current) {
-      inputRef.current.blur();
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 50);
-    }
-  };
-
   return (
-    <Pressable
-      onPress={handlePress}
-      className="items-center justify-center my-3 w-full"
-    >
-      {/* Hidden Native TextInput */}
+    <View className="items-center justify-center my-3 w-full">
+      {/* Tap the real input directly: deferred focus cannot open the iOS web keyboard. */}
       <TextInput
-        ref={inputRef}
+        accessibilityLabel="12-digit activation key"
         value={digits}
         onChangeText={handleChange}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         onSubmitEditing={onSubmit}
         keyboardType="number-pad"
+        inputMode="numeric"
+        autoComplete="off"
+        autoCorrect={false}
         maxLength={12}
         caretHidden
         style={{
           position: "absolute",
-          width: 1,
-          height: 1,
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          zIndex: 1,
+          fontSize: 16,
+          color: "transparent",
+          backgroundColor: "transparent",
           opacity: 0.01,
         }}
       />
 
       {/* Underline Groups Display (3 compact groups of 4 slots with dashes in between) */}
-      <View className="flex-row items-center justify-center gap-1.5 my-1">
+      <View pointerEvents="none" className="flex-row items-center justify-center gap-1.5 my-1">
         {[0, 1, 2].map((groupIdx) => (
           <React.Fragment key={groupIdx}>
             {groupIdx > 0 && (
@@ -132,10 +126,10 @@ function UnderlineKeyInput({
         ))}
       </View>
 
-      <Text className="text-text-secondary text-xs mt-3 font-normal text-center">
+      <Text pointerEvents="none" className="text-text-secondary text-xs mt-3 font-normal text-center">
         Enter your key here
       </Text>
-    </Pressable>
+    </View>
   );
 }
 
