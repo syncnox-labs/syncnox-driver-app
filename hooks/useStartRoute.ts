@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert } from '@/utils/alert';
 import { useRouteStore } from '@/store/route.store';
 import { AssignedRoute } from '@/types/route.types';
 

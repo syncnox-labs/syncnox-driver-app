@@ -1,3 +1,4 @@
+import { Alert } from '@/utils/alert';
 import React, { useState } from 'react';
 import {
   View,
@@ -5,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  Alert,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -505,7 +505,7 @@ export default function DriverScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* ── Header ── */}
         <View style={{ paddingHorizontal: 20, paddingTop: 4 }}>

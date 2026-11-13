@@ -1,3 +1,4 @@
+import { openNavigation } from '@/utils/navigation';
 import React, { useState } from 'react';
 import {
   View,
@@ -5,8 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Linking,
-  Platform,
   ActivityIndicator,
   TextInput,
   Keyboard,
@@ -355,20 +354,11 @@ function RouteDetailContent({ routeId }: { routeId?: string }) {
   }
 
   function handleNavigateTo(stop: RouteStop) {
-    const lat = stop.location?.lat || stop.job?.location?.lat;
-    const lng = stop.location?.lng || stop.job?.location?.lng;
-    const addr = stop.address_formatted || stop.job?.address_formatted;
-    if (lat && lng) {
-      const url = Platform.select({
-        ios: `maps://app?daddr=${lat},${lng}`,
-        default: `google.navigation:q=${lat},${lng}`,
-      });
-      Linking.openURL(url!).catch(() =>
-        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`),
-      );
-    } else if (addr) {
-      Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
-    }
+    void openNavigation({
+      lat: stop.location?.lat ?? stop.job?.location?.lat,
+      lng: stop.location?.lng ?? stop.job?.location?.lng,
+      address: stop.address_formatted || stop.job?.address_formatted,
+    });
   }
 
   return (

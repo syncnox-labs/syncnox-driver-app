@@ -1,3 +1,5 @@
+import { openNavigation } from '@/utils/navigation';
+import { Alert } from '@/utils/alert';
 import React, { useMemo, useState } from 'react';
 import {
   View,
@@ -5,9 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Alert,
   Linking,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -99,21 +99,11 @@ export default function ShuttleStopScreen({ route, stops }: Props) {
   }
 
   function handleNavigate() {
-    const lat = first.location?.lat;
-    const lng = first.location?.lng;
-    if (lat && lng) {
-      const url = Platform.select({
-        ios: `maps://app?daddr=${lat},${lng}`,
-        default: `google.navigation:q=${lat},${lng}`,
-      });
-      Linking.openURL(url!).catch(() =>
-        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`),
-      );
-    } else if (address) {
-      Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(address)}`).catch(() =>
-        Alert.alert('Error', 'Could not open maps application.'),
-      );
-    }
+    void openNavigation({
+      lat: first.location?.lat ?? first.job?.location?.lat,
+      lng: first.location?.lng ?? first.job?.location?.lng,
+      address,
+    });
   }
 
   const choiceLabel = (c: Choice) => (c === 'completed' ? doneLabel : c === 'failed' ? failLabel : 'Pending');

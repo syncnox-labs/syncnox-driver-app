@@ -1,3 +1,4 @@
+import { Alert } from '@/utils/alert';
 import React, { useState } from "react";
 import {
   View,
@@ -6,7 +7,6 @@ import {
   Switch,
   ScrollView,
   StatusBar,
-  Alert,
   Platform,
   Linking,
 } from "react-native";
@@ -16,6 +16,7 @@ import GradientBackground from "@/components/ui/GradientBackground";
 import SyncnoxMark from "@/components/SyncnoxMark";
 import { useAuthStore } from "@/store/auth.store";
 import { useRouteStore } from "@/store/route.store";
+import { navigationLabels, usePreferencesStore } from "@/store/preferences.store";
 
 // ------------------------------------------------------------------ //
 // Settings Section & Row Helpers
@@ -100,15 +101,12 @@ function SettingRow({
 export default function SettingsTabScreen() {
   const { logout, driverName, driverId } = useAuthStore();
   const { distanceUnit, setDistanceUnit } = useRouteStore();
+  const { navigationApp, setNavigationApp } = usePreferencesStore();
   const [workingNow, setWorkingNow] = useState(true);
   const [useCircleMarkers, setUseCircleMarkers] = useState(false);
 
   const handleLogout = () => {
     const message = "Are you sure you want to log out? You will need your activation code to log in again.";
-    if (Platform.OS === 'web') {
-      if (window.confirm(message)) void logout();
-      return;
-    }
     Alert.alert(
       "Log Out",
       message,
@@ -163,9 +161,11 @@ export default function SettingsTabScreen() {
       "Default Navigation",
       "Choose your preferred navigation application:",
       [
-        { text: "Google Maps", onPress: () => {} },
-        { text: "Waze", onPress: () => {} },
-        { text: "Apple Maps (iOS)", onPress: () => {} },
+        { text: "Google Maps", onPress: () => setNavigationApp('google') },
+        { text: "Waze", onPress: () => setNavigationApp('waze') },
+        ...(Platform.OS === 'android' ? [] : [
+          { text: "Apple Maps", onPress: () => setNavigationApp('apple') },
+        ]),
         { text: "Cancel", style: "cancel" },
       ],
       { cancelable: true },
@@ -303,7 +303,7 @@ export default function SettingsTabScreen() {
           <SettingRow
             icon="navigate-outline"
             label="Default navigation"
-            value="Google Maps"
+            value={navigationLabels[navigationApp]}
             onPress={handleNavigationSelect}
           />
 

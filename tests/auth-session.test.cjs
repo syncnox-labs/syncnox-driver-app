@@ -158,6 +158,7 @@ function availableScreens(auth) {
     react: { useEffect() {} },
     '@/store/auth.store': { useAuthStore: () => auth.getState() },
     '@/hooks/useRouteReminders': { useRouteReminders() {} },
+    '@/components/ui/AlertHost': { __esModule: true, default: Component },
     'react-native': { View: Component, StatusBar: Component, LogBox: { ignoreAllLogs() {} } },
     'react-native-paper': { ActivityIndicator: Component, PaperProvider: Component, MD3DarkTheme: { colors: {} } },
   });

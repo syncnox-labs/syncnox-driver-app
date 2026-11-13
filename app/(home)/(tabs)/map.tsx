@@ -1,3 +1,5 @@
+import { openNavigation } from '@/utils/navigation';
+import { Alert } from '@/utils/alert';
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import Svg, { Path, Circle, Text as SvgText, G } from "react-native-svg";
 import {
@@ -5,11 +7,8 @@ import {
   Text,
   TouchableOpacity,
   Dimensions,
-  Platform,
   ActivityIndicator,
   FlatList,
-  Alert,
-  Linking,
 } from "react-native";
 import RouteMap from "@/components/maps/RouteMap";
 import type { RouteMapHandle } from "@/components/maps/RouteMap.types";
@@ -553,21 +552,13 @@ export default function MapTabScreen() {
     );
   }
 
-  // Open native maps for navigation
-  const openNavigation = (stop: RouteStop) => {
+  const navigateToStop = (stop: RouteStop) => {
     const coords = getStopCoords(stop);
-    if (!coords) return;
-    const { latitude: lat, longitude: lng } = coords;
-    const url = Platform.select({
-      ios: `maps://app?daddr=${lat},${lng}`,
-      web: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
-      default: `google.navigation:q=${lat},${lng}`,
+    void openNavigation({
+      lat: coords?.latitude,
+      lng: coords?.longitude,
+      address: stop.address_formatted || stop.job?.address_formatted,
     });
-    Linking.openURL(url!).catch(() =>
-      Linking.openURL(
-        `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
-      ),
-    );
   };
 
   const renderGroupSlide = ({
@@ -947,7 +938,7 @@ export default function MapTabScreen() {
               {/* Navigate button */}
               {hasCoords &&
                 (isTerminal || group.progress === "pending" || group.progress === "partial") && (
-                  <NavigateButton onPress={() => openNavigation(rep)} />
+                  <NavigateButton onPress={() => navigateToStop(rep)} />
                 )}
 
               {/* View Details / Manifest */}

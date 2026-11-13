@@ -1,3 +1,5 @@
+import { openNavigation } from '@/utils/navigation';
+import { Alert } from '@/utils/alert';
 import React, { useMemo, useState } from 'react';
 import {
   View,
@@ -5,9 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Alert,
   Linking,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -250,21 +250,11 @@ export default function StopDetailScreen() {
 
   function handleNavigate() {
     if (!stop) return;
-    const lat = stop.location?.lat || job?.location?.lat;
-    const lng = stop.location?.lng || job?.location?.lng;
-    if (lat && lng) {
-      const url = Platform.select({
-        ios: `maps://app?daddr=${lat},${lng}`,
-        default: `google.navigation:q=${lat},${lng}`,
-      });
-      Linking.openURL(url!).catch(() =>
-        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`),
-      );
-    } else if (address) {
-      Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(address)}`).catch(() =>
-        Alert.alert('Error', 'Could not open maps application.'),
-      );
-    }
+    void openNavigation({
+      lat: stop.location?.lat ?? job?.location?.lat,
+      lng: stop.location?.lng ?? job?.location?.lng,
+      address: address ?? undefined,
+    });
   }
 
   function handleCall() {

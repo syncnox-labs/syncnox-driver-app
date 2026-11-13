@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useAuthStore } from "@/store/auth.store";
 import { useRouteReminders } from "@/hooks/useRouteReminders";
 import { View, StatusBar, LogBox } from "react-native";
+import AlertHost from "@/components/ui/AlertHost";
 
 import { ActivityIndicator, PaperProvider, MD3DarkTheme } from "react-native-paper";
 
@@ -51,6 +52,7 @@ export default function RootLayout() {
 
   return (
     <PaperProvider theme={syncnoxTheme}>
+      <AlertHost />
       <StatusBar barStyle="light-content" />
       <Stack
         screenOptions={{
